@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   apk:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
@@ -28,9 +28,22 @@ jobs:
           mkdir -p "$RUNNER_TEMP/model-tests"
           javac -d "$RUNNER_TEMP/model-tests" android/app/src/main/java/fr/ialocale/mobile/ModelFiles.java android/tests/ModelFilesTest.java
           java -cp "$RUNNER_TEMP/model-tests" fr.ialocale.mobile.ModelFilesTest
+      - name: Installer les outils Android
+        uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '12266719'
+          accept-android-sdk-licenses: 'true'
+          packages: 'platform-tools'
       - name: SDK NDK CMake
+        shell: bash
         run: |
+          command -v sdkmanager
+          sdkmanager --version
           sdkmanager --install 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
+          test -f "$ANDROID_HOME/platforms/android-35/android.jar"
+          test -x "$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          test -f "$ANDROID_HOME/ndk/27.2.12479018/source.properties"
+          test -x "$ANDROID_HOME/cmake/3.22.1/bin/cmake"
       - name: Compilation native et APK debug
         working-directory: android
         run: gradle --no-daemon --max-workers=2 :app:assembleDebug
