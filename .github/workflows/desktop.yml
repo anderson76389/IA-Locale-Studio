@@ -1,0 +1,121 @@
+name: Desktop - Windows et Linux
+on:
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/desktop.yml'
+      - '.github/workflows/android.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - 'android/**'
+      - '.github/workflows/desktop.yml'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  desktop:
+    name: Desktop ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            platform: Windows-x64
+            binary: IA-Locale-Studio.exe
+          - os: ubuntu-24.04
+            platform: Linux-x64
+            binary: IA-Locale-Studio-Linux
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache: false
+      - name: Tests et analyse Go
+        working-directory: desktop
+        run: |
+          go vet ./...
+          go test -count=1 -v ./...
+      - name: Détection des accès concurrents
+        if: runner.os == 'Linux'
+        working-directory: desktop
+        run: go test -race -count=1 ./...
+      - name: Vérifier JavaScript
+        run: node --check desktop/web/app.js
+      - name: Compiler un exécutable autonome
+        working-directory: desktop
+        shell: bash
+        env:
+          CGO_ENABLED: '0'
+        run: |
+          mkdir -p ../dist
+          go build -trimpath -ldflags="-s -w" -o "../dist/${{ matrix.binary }}" .
+      - name: Test HTTP de l’exécutable
+        run: python desktop/ci_smoke.py "dist/${{ matrix.binary }}"
+      - name: Test des fichiers d’interface et du serveur Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          cp dist/IA-Locale-Studio-Linux IA-Locale-Studio-Linux
+          python desktop/smoke_test.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IA-Locale-Studio-${{ matrix.platform }}
+          path: dist/${{ matrix.binary }}
+          if-no-files-found: error
+          retention-days: 14
+  android:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    uses: ./.github/workflows/android.yml
+    secrets: inherit
+    permissions:
+      contents: read
+  release:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: [desktop, android]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Vérifier et réunir les trois exécutables
+        shell: bash
+        run: |
+          mkdir release
+          cp artifacts/IA-Locale-Studio-Windows-x64/IA-Locale-Studio.exe release/
+          cp artifacts/IA-Locale-Studio-Linux-x64/IA-Locale-Studio-Linux release/
+          (cd artifacts/IA-Locale-Studio-Android-preview && sha256sum -c SHA256SUMS.txt)
+          cp artifacts/IA-Locale-Studio-Android-preview/IA-Locale-Studio.apk release/
+          cd release
+          sha256sum IA-Locale-Studio.exe IA-Locale-Studio-Linux IA-Locale-Studio.apk > SHA256SUMS.txt
+      - name: Publier les trois versions ensemble
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="preview-${GITHUB_SHA:0:12}"
+          if gh release view "$tag" --json isDraft >/dev/null 2>&1; then
+            if [[ "$(gh release view "$tag" --json isDraft --jq .isDraft)" == "false" ]]; then
+              gh release view "$tag" --json assets --jq '.assets[].name' | sort > /tmp/published-assets
+              printf '%s\n' IA-Locale-Studio.exe IA-Locale-Studio-Linux IA-Locale-Studio.apk SHA256SUMS.txt | sort | diff - /tmp/published-assets
+              exit 0
+            fi
+          else
+            gh release create "$tag" --draft --prerelease --target "$GITHUB_SHA" --title "IA Locale Studio - Préversion ${GITHUB_SHA:0:12}" --notes "PC : moteurs Ollama et ComfyUI à installer localement. Android : Texte/Code CPU, modèles GGUF non inclus. Sans clé de publication configurée, signature debug et mises à jour Android en place non garanties. Tests CI, pas de validation physique GPU/téléphone."
+          fi
+          gh release upload "$tag" release/IA-Locale-Studio.exe release/IA-Locale-Studio-Linux release/IA-Locale-Studio.apk release/SHA256SUMS.txt --clobber
+          gh release view "$tag" --json assets --jq '.assets[].name' | sort > /tmp/published-assets
+          printf '%s\n' IA-Locale-Studio.exe IA-Locale-Studio-Linux IA-Locale-Studio.apk SHA256SUMS.txt | sort | diff - /tmp/published-assets
+          gh release edit "$tag" --draft=false

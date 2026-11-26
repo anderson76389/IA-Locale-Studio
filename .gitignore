@@ -6,3 +6,10 @@
 *.apk
 *.jks
 *.keystore
+
+/desktop/data/
+/desktop/backups/
+/desktop/restauration-*/
+/desktop/IA-Locale-Studio*
+/dist/
+/release/

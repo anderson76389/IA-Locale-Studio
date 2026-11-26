@@ -4,105 +4,131 @@
 
 ### Votre intelligence artificielle. Vos appareils. Vos données.
 
-**Un atelier de création IA local, pensé pour fonctionner sans cloud.**
+**Cinq ateliers de création. Une IA locale, sans cloud obligatoire.**
 
-`Confidentialité` · `Hors ligne` · `Modèles libres` · `Interface française`
+`Windows` · `Linux` · `Android` · `Navigateur local`
 
-[Découvrir le projet](#-le-projet) · [Téléchargements](#-téléchargements) · [État du développement](#-état-du-développement) · [Compilation](#-compiler-android)
+[**Téléchargements**](#-téléchargements) · [Fonctionnalités](#-cinq-ateliers) · [Installation](#-démarrage) · [Code source](#-organisation)
 
 </div>
 
 ---
 
-## ✨ Le projet
+## 📦 Téléchargements
 
-IA Locale Studio vise à réunir cinq ateliers de création dans une application indépendante, légère et accessible, sans abonnement ni compte obligatoire. L'objectif : exécuter les modèles directement sur l'appareil, conserver ses créations localement et ne solliciter Internet que pour récupérer les modèles ou composants nécessaires.
+Toutes les éditions sont réunies dans ce dépôt. Les binaires sont destinés à être utilisés indépendamment, sans compte GitHub ni PC obligatoire pour Android.
 
-> **Projet en développement.** La première édition Android native a été compilée et vérifiée par CI ; les essais sur appareil physique restent à effectuer. Ce dépôt ne contient pas encore une version finale multiplateforme.
-
-## 🎨 Cinq espaces de création
-
-| Atelier | Utilisation | Android natif — état actuel |
+| Plateforme | Fichier | État |
 | :--- | :--- | :--- |
-| 💬 **Texte** | Conversation, rédaction, résumé | Moteur CPU intégré, à valider |
-| ⌨️ **Code** | Assistance et génération de code | Moteur CPU intégré, à valider |
-| 🖼️ **Image** | Création visuelle | À intégrer |
-| 🎬 **Vidéo** | Génération vidéo | À intégrer |
-| 🎵 **Musique** | Composition et génération musicale | À intégrer |
+| Windows x64 | `IA-Locale-Studio.exe` | Préversion PC, compilation CI |
+| Linux x64 | `IA-Locale-Studio-Linux` | Préversion PC, exécutable natif |
+| Navigateur | [http://localhost:1420/](http://localhost:1420/) | Interface intégrée au binaire PC |
+| Android ARM64 / x86-64 | `IA-Locale-Studio.apk` | [Première compilation validée](https://github.com/anderson76389/IA-Locale-Studio/actions/runs/45727507034) |
+
+**[Versions publiées](https://github.com/anderson76389/IA-Locale-Studio/releases)** · **[Compilations et artefacts](https://github.com/anderson76389/IA-Locale-Studio/actions)**
+
+Chaque modification du code intégrée à main déclenche les trois compilations. Les préversions multiplateformes sont publiées dans Releases uniquement si les trois compilations et contrôles requis passent ; une version incomplète reste en brouillon. Les artefacts Actions sont temporaires. Les APK de test utilisent une signature debug par défaut. Pour permettre les mises à jour Android sans désinstallation, une clé pérenne peut être configurée dans les secrets Actions : `IA_ANDROID_KEYSTORE_B64`, `IA_ANDROID_KEYSTORE_PASSWORD`, `IA_ANDROID_KEY_ALIAS`, `IA_ANDROID_KEY_PASSWORD`. Ne jamais publier la clé privée. Le numéro de version des APK de CI progresse avec les builds de publication. Les modèles et moteurs externes ne sont pas inclus dans les binaires PC.
+
+> **Important :** cette édition PC est la consolidation hors ligne expérimentale, indépendante de l'ancienne v0.7.12. Elle ne constitue pas une migration ni une version 1.0 certifiée.
+
+## 🎨 Cinq ateliers
+
+| Atelier | Windows / Linux / navigateur local | Android |
+| :--- | :--- | :--- |
+| 💬 Texte | Ollama local | llama.cpp CPU |
+| ⌨️ Code | Ollama local | llama.cpp CPU |
+| 🖼️ Image | ComfyUI + workflow et modèle compatibles | À intégrer |
+| 🎬 Vidéo | ComfyUI + workflow et modèle compatibles | À intégrer |
+| 🎵 Musique | ComfyUI + workflow et modèle compatibles | À intégrer |
+
+Sur PC : bibliothèque Hugging Face, téléchargement Ollama, historique local, observateur matériel, benchmark, sauvegarde et restauration. Les cinq parcours PC ont des tests avec moteurs simulés ; ils ne sont pas encore validés avec des générations réelles sur GPU. Aucun bouton de pause/reprise fictif : l'arrêt d'une attente ne garantit pas l'arrêt immédiat du moteur externe.
 
 ## 🔒 Local par conception
 
-- Génération sans serveur distant : moteur natif embarqué pour Texte et Code dans la préversion Android.
-- Modèles GGUF importés dans le stockage privé de l'application.
-- Aucun compte requis pour l'inférence locale.
-- Avertissement explicite en cas de tentative de téléchargement hors ligne.
-- Aucun PC ou service GitHub nécessaire pour utiliser l'APK après installation et import d'un modèle compatible.
-- Pas de clé privée, de modèle volumineux ni de données personnelles dans le dépôt.
+- Aucun compte ni serveur d'inférence distant obligatoire.
+- Internet pour rechercher et télécharger modèles et dépendances ; avertissement en cas de connexion indisponible.
+- Modèles installés utilisables hors ligne lorsque les moteurs sont configurés localement.
+- Serveur PC limité à la boucle locale ; pas d'exposition Internet.
+- Pas de télémétrie volontaire ajoutée dans le code de l'application ; moteurs, workflows et navigateur externes à vérifier séparément.
+- Aucun modèle volumineux, historique personnel ou clé privée publié dans GitHub.
 
-Internet reste nécessaire pour obtenir de nouveaux modèles ; la préversion ouvre Hugging Face dans le navigateur pour le téléchargement, puis permet l'import local. Les modèles et moteurs médias restent à intégrer.
+## 🚀 Démarrage
 
-## 📦 Téléchargements
+### Windows
 
-| Plateforme | Format cible | Disponibilité dans ce dépôt |
-| :--- | :--- | :--- |
-| Android | `IA-Locale-Studio.apk` | [Préversion compilée](https://github.com/anderson76389/IA-Locale-Studio/actions/runs/45727507034) |
-| Windows 64 bits | `.exe` | Pas encore publiée ici |
-| Linux 64 bits | `.AppImage` | Pas encore publiée ici |
+Télécharger le binaire, le placer dans un dossier dédié, puis l'exécuter. L'interface s'ouvre dans le navigateur local. Firefox est pris en charge par le lanceur lorsqu'il est détecté.
 
-**Android :** consulter les [compilations GitHub Actions](https://github.com/anderson76389/IA-Locale-Studio/actions) et la [code source Android](https://github.com/anderson76389/IA-Locale-Studio/tree/main/android).
-
-Pour la [compilation validée](https://github.com/anderson76389/IA-Locale-Studio/actions/runs/45727507034), télécharger l'artefact **IA-Locale-Studio-Android-preview** sur sa page Actions (un compte GitHub peut être requis pour récupérer l'artefact). Extraire uniquement `IA-Locale-Studio.apk`, puis l'installer sur Android. Aucun dossier Windows à transférer. Les artefacts de test sont temporaires et signés en mode debug ; les mises à jour pérennes nécessiteront une signature de publication stable.
-
-## 📱 Compatibilité visée
-
-| Appareil | Architecture / accélération |
-| :--- | :--- |
-| Smartphones et tablettes Android 8+ | ARM64 et x86-64 ; CPU dans la préversion |
-| Windows / Linux — NVIDIA | CUDA, selon moteur et matériel (objectif) |
-| Windows / Linux — AMD | Vulkan ou ROCm, selon compatibilité (objectif) |
-
-Pour commencer sur Android, privilégier un petit modèle GGUF instruct de 1 à 3 milliards de paramètres, quantifié en Q4. La mémoire disponible, la température et les capacités du modèle déterminent les performances. La compatibilité réelle sur téléphone reste à tester.
-
-## 🛠️ État du développement
-
-- [x] Architecture Android native indépendante du PC
-- [x] Code de génération Texte / Code avec llama.cpp
-- [x] Import GGUF, arrêt de génération et avertissement réseau
-- [x] Tests automatisés de l'import et workflow de compilation
-- [x] APK compilé, signature debug et intégrité vérifiées en CI
-- [ ] Exécution et génération sur appareil physique
-- [ ] Téléchargement intégré des modèles avec pause et reprise
-- [ ] Accélération GPU / NPU et mesures de mémoire, batterie et température
-- [ ] Moteurs Image, Vidéo et Musique
-- [ ] Historique, bibliothèque et sauvegarde intégrée
-- [ ] Versions stables Windows, Linux et Android avec validation hors ligne
-
-## ⚙️ Compiler Android
-
-Le code Android est disponible dans la [branche principale](https://github.com/anderson76389/IA-Locale-Studio/tree/main/android).
-
-**Prérequis :** JDK 17, Gradle 8.9, SDK Android 35, Build Tools 35.0.0, NDK 27.2.12479018 et CMake 3.22.1.
+### Linux
 
 ```bash
-git clone https://github.com/anderson76389/IA-Locale-Studio.git
-cd IA-Locale-Studio/android
+chmod +x IA-Locale-Studio-Linux
+./IA-Locale-Studio-Linux
+```
+
+### Navigateur
+
+Une fois le programme PC démarré, ouvrir **http://localhost:1420/**. Ce mode n'est pas un site hébergé : le serveur d'inférence et les fichiers restent sur l'appareil. Utiliser `-no-browser` pour démarrer sans ouverture automatique.
+
+Installer Ollama et/ou ComfyUI localement, puis les modèles nécessaires. Consulter le [guide PC complet](desktop/README.md) pour les workflows API JSON, les dossiers, le stockage et les paramètres de confidentialité.
+
+### Android
+
+Installer uniquement `IA-Locale-Studio.apk`. Télécharger un modèle GGUF compatible depuis Hugging Face, puis l'importer dans l'application. Le moteur CPU natif est embarqué. Commencer par un petit modèle instruct quantifié (1–3B Q4). La génération réelle, la consommation et l'accélération GPU/NPU restent à tester.
+
+## 🗂️ Organisation
+
+```text
+IA-Locale-Studio/
+├── android/           Application native Java / C++ et llama.cpp
+├── desktop/           Serveur Go, moteurs locaux et outils
+│   ├── web/            Interface navigateur embarquée
+│   ├── *_test.go       Tests Go
+│   └── README.md       Guide PC détaillé
+└── .github/workflows/  Compilation et publication CI
+```
+
+### Compiler
+
+**PC :** Go 1.22 minimum (CI avec Go 1.25), aucun module Go externe.
+
+```bash
+cd desktop
+go test ./...
+go build -o IA-Locale-Studio .
+```
+
+Sous Windows, utiliser `go build -o IA-Locale-Studio.exe .`.
+
+**Android :** JDK 17, Gradle 8.9, SDK Android 35, NDK 27.2.12479018, CMake 3.22.1.
+
+```bash
+cd android
 gradle --no-daemon :app:assembleDebug
 ```
 
 Sortie : `app/build/outputs/apk/debug/app-debug.apk`.
 
-La compilation récupère les dépendances et le moteur llama.cpp. L'application compilée n'a pas besoin de GitHub pour générer localement.
+## 🛠️ Validation restante
+
+- [x] Première compilation Android ARM64 et x86-64, signature debug vérifiée
+- [x] Code source PC et interface navigateur réunis
+- [x] Tests Go de la consolidation PC exécutés localement
+- [ ] Validation des nouvelles compilations PC en CI
+- [ ] Génération réelle et mesure des performances AMD / NVIDIA
+- [ ] Validation Android sur téléphone physique
+- [ ] Moteurs Image, Vidéo et Musique natifs Android
+- [ ] Signature pérenne Android, optimisation et tests prolongés
 
 ## 🧩 Technologies et licences
 
-Android natif (Java / C++ / JNI), Gradle, CMake et [llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT). Les modèles externes conservent leurs licences respectives. Aucune licence globale du projet n'est déclarée à ce stade.
+Go, HTML/CSS/JavaScript, Android Java/C++/JNI, Gradle, CMake, Ollama, ComfyUI et [llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT). Les modèles et moteurs gardent leurs propres licences. Aucune licence globale n'est déclarée à ce stade.
 
 ---
 
 <div align="center">
 
-**IA Locale Studio** · Une IA personnelle, indépendante et locale.
+**IA Locale Studio** · Créer localement, garder le contrôle.
 
-Développement en cours — les fonctionnalités non validées ne sont pas présentées comme disponibles.
+Préversions expérimentales — aucune fonctionnalité non validée n'est présentée comme certifiée.
 
 </div>
