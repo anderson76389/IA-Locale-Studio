@@ -60,12 +60,10 @@ jobs:
           go build -trimpath -ldflags="-s -w" -o "../dist/${{ matrix.binary }}" .
       - name: Test HTTP de l’exécutable
         run: python desktop/ci_smoke.py "dist/${{ matrix.binary }}"
-      - name: Tests d’interface Linux (moteurs simulés)
+      - name: Test des fichiers d’interface et du serveur Linux
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          python -m pip install playwright
-          python -m playwright install --with-deps chromium
           cp dist/IA-Locale-Studio-Linux IA-Locale-Studio-Linux
           python desktop/smoke_test.py
       - uses: actions/upload-artifact@v4
