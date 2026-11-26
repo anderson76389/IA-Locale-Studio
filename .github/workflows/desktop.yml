@@ -1,0 +1,113 @@
+name: Desktop - Windows et Linux
+on:
+  pull_request:
+    paths:
+      - 'desktop/**'
+      - '.github/workflows/desktop.yml'
+      - '.github/workflows/android.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/**'
+      - 'android/**'
+      - '.github/workflows/desktop.yml'
+      - '.github/workflows/android.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  desktop:
+    name: Desktop ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            platform: Windows-x64
+            binary: IA-Locale-Studio.exe
+          - os: ubuntu-24.04
+            platform: Linux-x64
+            binary: IA-Locale-Studio-Linux
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache: false
+      - name: Tests et analyse Go
+        working-directory: desktop
+        run: |
+          go vet ./...
+          go test -count=1 -v ./...
+      - name: Détection des accès concurrents
+        if: runner.os == 'Linux'
+        working-directory: desktop
+        run: go test -race -count=1 ./...
+      - name: Vérifier JavaScript
+        run: node --check desktop/web/app.js
+      - name: Compiler un exécutable autonome
+        working-directory: desktop
+        shell: bash
+        env:
+          CGO_ENABLED: '0'
+        run: |
+          mkdir -p ../dist
+          go build -trimpath -ldflags="-s -w" -o "../dist/${{ matrix.binary }}" .
+      - name: Test HTTP de l’exécutable
+        run: python desktop/ci_smoke.py "dist/${{ matrix.binary }}"
+      - name: Tests d’interface Linux (moteurs simulés)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          python -m pip install playwright
+          python -m playwright install --with-deps chromium
+          cp dist/IA-Locale-Studio-Linux IA-Locale-Studio-Linux
+          python desktop/smoke_test.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: IA-Locale-Studio-${{ matrix.platform }}
+          path: dist/${{ matrix.binary }}
+          if-no-files-found: error
+          retention-days: 14
+  android:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    uses: ./.github/workflows/android.yml
+    permissions:
+      contents: read
+  release:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: [desktop, android]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Vérifier et réunir les trois exécutables
+        shell: bash
+        run: |
+          mkdir release
+          cp artifacts/IA-Locale-Studio-Windows-x64/IA-Locale-Studio.exe release/
+          cp artifacts/IA-Locale-Studio-Linux-x64/IA-Locale-Studio-Linux release/
+          (cd artifacts/IA-Locale-Studio-Android-preview && sha256sum -c SHA256SUMS.txt)
+          cp artifacts/IA-Locale-Studio-Android-preview/IA-Locale-Studio.apk release/
+          cd release
+          sha256sum IA-Locale-Studio.exe IA-Locale-Studio-Linux IA-Locale-Studio.apk > SHA256SUMS.txt
+      - name: Publier une préversion
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          tag="preview-${GITHUB_SHA:0:12}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Préversion déjà publiée : $tag"
+          else
+            gh release create "$tag" release/IA-Locale-Studio.exe release/IA-Locale-Studio-Linux release/IA-Locale-Studio.apk release/SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease --title "IA Locale Studio - Préversion multiplateforme" --notes "PC Windows/Linux : cinq ateliers via moteurs locaux Ollama/ComfyUI à installer séparément, interface navigateur localhost:1420. Android : Texte/Code CPU, import GGUF, signature debug non pérenne. Aucun modèle fourni. Tests CI avec moteurs simulés ; validation GPU et téléphone physique restante."
+          fi
