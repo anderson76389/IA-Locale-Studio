@@ -18,7 +18,7 @@
 
 IA Locale Studio vise à réunir cinq ateliers de création dans une application indépendante, légère et accessible, sans abonnement ni compte obligatoire. L'objectif : exécuter les modèles directement sur l'appareil, conserver ses créations localement et ne solliciter Internet que pour récupérer les modèles ou composants nécessaires.
 
-> **Projet en développement.** La première édition Android native est en cours de validation. Ce dépôt ne contient pas encore une version finale multiplateforme.
+> **Projet en développement.** La première édition Android native a été compilée et vérifiée par CI ; les essais sur appareil physique restent à effectuer. Ce dépôt ne contient pas encore une version finale multiplateforme.
 
 ## 🎨 Cinq espaces de création
 
@@ -45,13 +45,13 @@ Internet reste nécessaire pour obtenir de nouveaux modèles ; la préversion ou
 
 | Plateforme | Format cible | Disponibilité dans ce dépôt |
 | :--- | :--- | :--- |
-| Android | `IA-Locale-Studio.apk` | Préversion en compilation |
+| Android | `IA-Locale-Studio.apk` | [Préversion compilée](https://github.com/anderson76389/IA-Locale-Studio/actions/runs/45727507034) |
 | Windows 64 bits | `.exe` | Pas encore publiée ici |
 | Linux 64 bits | `.AppImage` | Pas encore publiée ici |
 
-**Android :** consulter les [compilations GitHub Actions](https://github.com/anderson76389/IA-Locale-Studio/actions) et la [branche de développement](https://github.com/anderson76389/IA-Locale-Studio/tree/android/native-preview/android).
+**Android :** consulter les [compilations GitHub Actions](https://github.com/anderson76389/IA-Locale-Studio/actions) et la [code source Android](https://github.com/anderson76389/IA-Locale-Studio/tree/main/android).
 
-Lorsqu'une compilation réussit, télécharger l'artefact **IA-Locale-Studio-Android-preview** sur sa page Actions (un compte GitHub peut être requis pour récupérer l'artefact). Extraire uniquement `IA-Locale-Studio.apk`, puis l'installer sur Android. Aucun dossier Windows à transférer. Les artefacts de test sont temporaires et signés en mode debug ; les mises à jour pérennes nécessiteront une signature de publication stable.
+Pour la [compilation validée](https://github.com/anderson76389/IA-Locale-Studio/actions/runs/45727507034), télécharger l'artefact **IA-Locale-Studio-Android-preview** sur sa page Actions (un compte GitHub peut être requis pour récupérer l'artefact). Extraire uniquement `IA-Locale-Studio.apk`, puis l'installer sur Android. Aucun dossier Windows à transférer. Les artefacts de test sont temporaires et signés en mode debug ; les mises à jour pérennes nécessiteront une signature de publication stable.
 
 ## 📱 Compatibilité visée
 
@@ -69,7 +69,8 @@ Pour commencer sur Android, privilégier un petit modèle GGUF instruct de 1 à 
 - [x] Code de génération Texte / Code avec llama.cpp
 - [x] Import GGUF, arrêt de génération et avertissement réseau
 - [x] Tests automatisés de l'import et workflow de compilation
-- [ ] APK compilé et vérifié sur appareil physique
+- [x] APK compilé, signature debug et intégrité vérifiées en CI
+- [ ] Exécution et génération sur appareil physique
 - [ ] Téléchargement intégré des modèles avec pause et reprise
 - [ ] Accélération GPU / NPU et mesures de mémoire, batterie et température
 - [ ] Moteurs Image, Vidéo et Musique
@@ -78,12 +79,12 @@ Pour commencer sur Android, privilégier un petit modèle GGUF instruct de 1 à 
 
 ## ⚙️ Compiler Android
 
-Le code Android est actuellement disponible dans la [branche android/native-preview](https://github.com/anderson76389/IA-Locale-Studio/tree/android/native-preview/android).
+Le code Android est disponible dans la [branche principale](https://github.com/anderson76389/IA-Locale-Studio/tree/main/android).
 
 **Prérequis :** JDK 17, Gradle 8.9, SDK Android 35, Build Tools 35.0.0, NDK 27.2.12479018 et CMake 3.22.1.
 
 ```bash
-git clone -b android/native-preview https://github.com/anderson76389/IA-Locale-Studio.git
+git clone https://github.com/anderson76389/IA-Locale-Studio.git
 cd IA-Locale-Studio/android
 gradle --no-daemon :app:assembleDebug
 ```
