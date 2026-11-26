@@ -590,6 +590,12 @@ func (s *Studio) serve(w http.ResponseWriter, r *http.Request) {
 			reject(w, 409, "Aucune génération arrêtable")
 		}
 	case "POST /api/backup":
+		// Read the request before replying, including on clients that close
+		// the connection after each response.
+		if _, err := io.Copy(io.Discard, http.MaxBytesReader(w, r.Body, 4<<20)); err != nil {
+			reject(w, 400, "Corps de requête invalide")
+			return
+		}
 		j, e := s.start("backup", func(ctx context.Context, job string) error {
 			p := filepath.Join(s.root, "backups", job+".zip")
 			if e := backup(filepath.Join(s.root, "data"), p); e != nil {
