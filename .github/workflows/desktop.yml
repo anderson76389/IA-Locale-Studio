@@ -75,6 +75,7 @@ jobs:
   android:
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     uses: ./.github/workflows/android.yml
+    secrets: inherit
     permissions:
       contents: read
   release:
@@ -98,14 +99,23 @@ jobs:
           cp artifacts/IA-Locale-Studio-Android-preview/IA-Locale-Studio.apk release/
           cd release
           sha256sum IA-Locale-Studio.exe IA-Locale-Studio-Linux IA-Locale-Studio.apk > SHA256SUMS.txt
-      - name: Publier une préversion
+      - name: Publier les trois versions ensemble
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          set -euo pipefail
           tag="preview-${GITHUB_SHA:0:12}"
-          if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Préversion déjà publiée : $tag"
+          if gh release view "$tag" --json isDraft >/dev/null 2>&1; then
+            if [[ "$(gh release view "$tag" --json isDraft --jq .isDraft)" == "false" ]]; then
+              gh release view "$tag" --json assets --jq '.assets[].name' | sort > /tmp/published-assets
+              printf '%s\n' IA-Locale-Studio.exe IA-Locale-Studio-Linux IA-Locale-Studio.apk SHA256SUMS.txt | sort | diff - /tmp/published-assets
+              exit 0
+            fi
           else
-            gh release create "$tag" release/IA-Locale-Studio.exe release/IA-Locale-Studio-Linux release/IA-Locale-Studio.apk release/SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease --title "IA Locale Studio - Préversion multiplateforme" --notes "PC Windows/Linux : cinq ateliers via moteurs locaux Ollama/ComfyUI à installer séparément, interface navigateur localhost:1420. Android : Texte/Code CPU, import GGUF, signature debug non pérenne. Aucun modèle fourni. Tests CI avec moteurs simulés ; validation GPU et téléphone physique restante."
+            gh release create "$tag" --draft --prerelease --target "$GITHUB_SHA" --title "IA Locale Studio - Préversion ${GITHUB_SHA:0:12}" --notes "PC : moteurs Ollama et ComfyUI à installer localement. Android : Texte/Code CPU, modèles GGUF non inclus. Sans clé de publication configurée, signature debug et mises à jour Android en place non garanties. Tests CI, pas de validation physique GPU/téléphone."
           fi
+          gh release upload "$tag" release/IA-Locale-Studio.exe release/IA-Locale-Studio-Linux release/IA-Locale-Studio.apk release/SHA256SUMS.txt --clobber
+          gh release view "$tag" --json assets --jq '.assets[].name' | sort > /tmp/published-assets
+          printf '%s\n' IA-Locale-Studio.exe IA-Locale-Studio-Linux IA-Locale-Studio.apk SHA256SUMS.txt | sort | diff - /tmp/published-assets
+          gh release edit "$tag" --draft=false

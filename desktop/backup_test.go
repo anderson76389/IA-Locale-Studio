@@ -158,15 +158,37 @@ func TestCorruption(t *testing.T) {
 		t.Fatal("accepted corrupted bytes")
 	}
 }
+// Exercise the archive collision check on every OS, even when the host filesystem
+// cannot store two names which differ only by case.
 func TestCollision(t *testing.T) {
-	r, a := setup(t)
-	if e := os.WriteFile(filepath.Join(r, "CONFIG.JSON"), []byte("x"), 0600); e != nil {
-		t.Skip(e)
-	}
-	if _, e := os.Stat(filepath.Join(r, "config.json")); e != nil {
-		t.Skip(e)
-	}
-	if backup(r, a) == nil {
-		t.Fatal("accepted case collision")
-	}
+    a := filepath.Join(t.TempDir(), "collision.zip")
+    f, err := os.Create(a)
+    if err != nil { t.Fatal(err) }
+    z := zip.NewWriter(f)
+    hash := sha256.Sum256([]byte("x"))
+    entries := []Entry{}
+    for _, name := range []string{"config.json", "CONFIG.JSON"} {
+        w, err := z.Create("data/" + name)
+        if err != nil { t.Fatal(err) }
+        if _, err = w.Write([]byte("x")); err != nil { t.Fatal(err) }
+        entries = append(entries, Entry{Path:name, Size:1, SHA256:hex.EncodeToString(hash[:]), Mode:0600})
+    }
+    w, err := z.Create(manifestName)
+    if err != nil { t.Fatal(err) }
+    if err = json.NewEncoder(w).Encode(Manifest{Version:1, Entries:entries}); err != nil { t.Fatal(err) }
+    if err = z.Close(); err != nil { t.Fatal(err) }
+    if err = f.Close(); err != nil { t.Fatal(err) }
+    if err = verify(a, ""); err == nil { t.Fatal("accepted case collision") }
+    dst := filepath.Join(filepath.Dir(a), "restored")
+    if err = restore(a, dst); err == nil || exists(dst) { t.Fatal("published a colliding archive") }
+}
+
+func TestSourceCollision(t *testing.T) {
+    r, a := setup(t)
+    // Exclusive create never overwrites config.json on Windows.
+    f, err := os.OpenFile(filepath.Join(r, "CONFIG.JSON"), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+    if os.IsExist(err) { t.Skip("case-insensitive filesystem; archive collision tested separately") }
+    if err != nil { t.Fatal(err) }
+    if err = f.Close(); err != nil { t.Fatal(err) }
+    if err = backup(r, a); err == nil { t.Fatal("accepted case collision in source") }
 }

@@ -27,7 +27,7 @@ Toutes les éditions sont réunies dans ce dépôt. Les binaires sont destinés 
 
 **[Versions publiées](https://github.com/anderson76389/IA-Locale-Studio/releases)** · **[Compilations et artefacts](https://github.com/anderson76389/IA-Locale-Studio/actions)**
 
-Les préversions multiplateformes sont publiées par CI uniquement si les trois compilations et contrôles requis passent. Les artefacts Actions sont temporaires. Les APK de test utilisent une signature debug : une clé de publication stable reste nécessaire. Les modèles et moteurs externes ne sont pas inclus dans les binaires PC.
+Chaque modification du code intégrée à main déclenche les trois compilations. Les préversions multiplateformes sont publiées dans Releases uniquement si les trois compilations et contrôles requis passent ; une version incomplète reste en brouillon. Les artefacts Actions sont temporaires. Les APK de test utilisent une signature debug par défaut. Pour permettre les mises à jour Android sans désinstallation, une clé pérenne peut être configurée dans les secrets Actions : `IA_ANDROID_KEYSTORE_B64`, `IA_ANDROID_KEYSTORE_PASSWORD`, `IA_ANDROID_KEY_ALIAS`, `IA_ANDROID_KEY_PASSWORD`. Ne jamais publier la clé privée. Le numéro de version des APK de CI progresse avec les builds de publication. Les modèles et moteurs externes ne sont pas inclus dans les binaires PC.
 
 > **Important :** cette édition PC est la consolidation hors ligne expérimentale, indépendante de l'ancienne v0.7.12. Elle ne constitue pas une migration ni une version 1.0 certifiée.
 

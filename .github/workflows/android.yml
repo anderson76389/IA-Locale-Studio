@@ -6,6 +6,15 @@ on:
       - '.github/workflows/android.yml'
   workflow_dispatch:
   workflow_call:
+    secrets:
+      IA_ANDROID_KEYSTORE_B64:
+        required: false
+      IA_ANDROID_KEYSTORE_PASSWORD:
+        required: false
+      IA_ANDROID_KEY_ALIAS:
+        required: false
+      IA_ANDROID_KEY_PASSWORD:
+        required: false
 permissions:
   contents: read
 concurrency:
@@ -47,11 +56,36 @@ jobs:
           test -x "$ANDROID_HOME/cmake/3.22.1/bin/cmake"
       - name: Compilation native et APK debug
         working-directory: android
-        run: gradle --no-daemon --max-workers=2 :app:assembleDebug
+        shell: bash
+        run: |
+          export IA_VERSION_CODE=$((GITHUB_RUN_NUMBER + 1))
+          gradle --no-daemon --max-workers=2 :app:assembleDebug
+      - name: Signature de publication (si configurée)
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          IA_ANDROID_KEYSTORE_B64: ${{ secrets.IA_ANDROID_KEYSTORE_B64 }}
+          IA_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.IA_ANDROID_KEYSTORE_PASSWORD }}
+          IA_ANDROID_KEY_ALIAS: ${{ secrets.IA_ANDROID_KEY_ALIAS }}
+          IA_ANDROID_KEY_PASSWORD: ${{ secrets.IA_ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          if [[ -z "$IA_ANDROID_KEYSTORE_B64" ]]; then
+            echo "::warning::Clé de publication absente, APK debug uniquement."
+            exit 0
+          fi
+          : "${IA_ANDROID_KEYSTORE_PASSWORD:?secret manquant}"
+          : "${IA_ANDROID_KEY_ALIAS:?secret manquant}"
+          : "${IA_ANDROID_KEY_PASSWORD:?secret manquant}"
+          keyfile="$(mktemp)"
+          trap 'rm -f "$keyfile"' EXIT
+          printf '%s' "$IA_ANDROID_KEYSTORE_B64" | base64 --decode > "$keyfile"
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks "$keyfile" --ks-key-alias "$IA_ANDROID_KEY_ALIAS" --ks-pass env:IA_ANDROID_KEYSTORE_PASSWORD --key-pass env:IA_ANDROID_KEY_PASSWORD --out dist/IA-Locale-Studio.apk android/app/build/outputs/apk/debug/app-debug.apk
       - name: Vérifier APK et signature
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/IA-Locale-Studio.apk
+          if [ ! -f dist/IA-Locale-Studio.apk ]; then cp android/app/build/outputs/apk/debug/app-debug.apk dist/IA-Locale-Studio.apk; fi
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose dist/IA-Locale-Studio.apk
           python3 - <<'PY'
           import zipfile
