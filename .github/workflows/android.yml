@@ -1,9 +1,5 @@
 name: Android - APK natif (preview)
 on:
-  pull_request:
-    paths:
-      - 'android/**'
-      - '.github/workflows/android.yml'
   workflow_dispatch:
   workflow_call:
     secrets:
@@ -96,6 +92,19 @@ jobs:
           PY
           cd dist
           sha256sum IA-Locale-Studio.apk > SHA256SUMS.txt
+      - name: Activer KVM pour l’émulateur
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Installer l’APK et tester les ateliers sur Android
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: python3 android/tests/workshop_ui.py dist/IA-Locale-Studio.apk
       - uses: actions/upload-artifact@v4
         with:
           name: IA-Locale-Studio-Android-preview

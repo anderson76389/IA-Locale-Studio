@@ -2,6 +2,7 @@ name: Desktop - Windows et Linux
 on:
   pull_request:
     paths:
+      - 'android/**'
       - 'README.md'
       - 'docs/**'
       - 'desktop/**'
