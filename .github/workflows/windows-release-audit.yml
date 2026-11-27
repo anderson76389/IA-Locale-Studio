@@ -1,0 +1,42 @@
+name: Audit du moteur Windows publié
+on:
+  push:
+    branches: [audit/windows-inference]
+permissions:
+  contents: read
+jobs:
+  published-windows:
+    runs-on: windows-2022
+    timeout-minutes: 16
+    env:
+      PYTHONUTF8: '1'
+      NO_PROXY: '127.0.0.1,localhost'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Télécharger et vérifier le binaire publié
+        shell: bash
+        run: |
+          mkdir audit-data
+          cd audit-data
+          release=https://github.com/anderson76389/IA-Locale-Studio/releases/download/preview-2e2b2495c21f
+          curl -fLsS --retry 2 "$release/IA-Locale-Studio.exe" -o IA-Locale-Studio.exe
+          curl -fLsS --retry 2 "$release/SHA256SUMS.txt" | awk '$2 == "IA-Locale-Studio.exe"' | sha256sum -c -
+      - name: Préparer Ollama CPU et le modèle GGUF
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force ia-audit-runtime/tmp
+          curl.exe -fLsS --retry 2 https://github.com/ollama/ollama/releases/download/v0.1.48/ollama-windows-amd64.zip -o audit-data/ollama.zip
+          Expand-Archive -Path audit-data/ollama.zip -DestinationPath audit-data/ollama
+          python audit/fetch_model.py ia-audit-runtime/models
+      - name: Installer Chromium
+        run: |
+          python -m pip install playwright==1.62.0
+          python -m playwright install --only-shell chromium
+      - name: Générer avec l’exécutable Windows publié
+        run: python -u audit/windows.py
+      - name: Afficher les erreurs du moteur
+        if: failure()
+        run: |
+          if (Test-Path ia-audit-runtime/ollama.log) {
+            Get-Content ia-audit-runtime/ollama.log | Select-String -Pattern 'error|failed|listening|version'
+          }
