@@ -38,13 +38,42 @@ def run():
             line=server.stdout.readline();url=line.split('http://localhost:')[1].strip();url='http://127.0.0.1:'+url;wait_url(url)
             with sync_playwright() as p:
                 browser=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH'),args=['--no-sandbox']);page=browser.new_page(accept_downloads=True);errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.goto(url);page.locator('#models option[value="local:1"]').wait_for(state='attached')
-                for w,h in [(1440,900),(768,1024),(390,844),(320,720)]:
+                tab_bar = page.get_by_role('navigation', name='Création')
+                expect(tab_bar.get_by_role('button', pressed=True)).to_have_text('✎Texte')
+                assert 'blur(' in tab_bar.evaluate('(bar) => getComputedStyle(bar).backdropFilter')
+                for w,h in [(1440,900),(768,1024),(390,844),(320,720),(667,375)]:
                     page.set_viewport_size({'width':w,'height':h})
                     for k in ['texte','code','image','video','musique']:
                         page.locator('button[data-kind='+k+']').click();assert page.locator('button.selected').get_attribute('data-kind')==k
                         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth+1'),(w,h,k)
                         assert page.locator('#media-settings').is_visible()==(k in ['image','video','musique'])
-                    print(f'PASS {w}×{h}: cinq sections, sélection, formulaires, aucun débordement')
+                    page.evaluate('scrollTo(0, document.body.scrollHeight)')
+                    bar = tab_bar.bounding_box()
+                    assert bar and bar['x'] >= 0 and bar['x'] + bar['width'] <= w + 1
+                    if w <= 760:
+                        assert abs(h - (bar['y'] + bar['height']) - 8) <= 1
+                        footer = page.locator('footer').bounding_box()
+                        assert footer and footer['y'] + footer['height'] <= bar['y']
+                    else:
+                        header = page.locator('header').bounding_box()
+                        assert header and bar['y'] >= header['y'] + header['height']
+                    code_tab = tab_bar.get_by_role('button', name='Code')
+                    code_tab.focus()
+                    code_tab.press('Enter')
+                    expect(code_tab).to_have_attribute('aria-pressed', 'true')
+                    expect(tab_bar.get_by_role('button', pressed=True)).to_have_count(1)
+                    assert page.locator('#heading').bounding_box()['y'] >= 0
+                    print(f'PASS {w}×{h}: barre visible au scroll, clavier, cinq ateliers, aucun débordement')
+                touch = browser.new_page(
+                    viewport={'width': 390, 'height': 844}, is_mobile=True, has_touch=True,
+                    reduced_motion='reduce',
+                )
+                touch.goto(url)
+                touch.get_by_role('button', name='Musique').tap()
+                expect(touch.get_by_role('heading', name='Créer de la musique')).to_be_visible()
+                expect(touch.get_by_role('button', name='Musique')).to_have_attribute('aria-pressed', 'true')
+                touch.close()
+                print('PASS navigation tactile avec animations réduites')
                 page.set_viewport_size({'width':1200,'height':900});page.locator('button[data-kind=texte]').click();page.locator('#prompt').fill('Test');page.locator('#generate').click();expect(page.locator('#state')).to_have_text('Terminé', timeout=10000);assert 'Bonjour test' in page.locator('#result').inner_text();print('PASS chat simulé dans l’interface')
                 with page.expect_download() as d:page.locator('#files button').first.click()
                 assert d.value.suggested_filename=='reponse.txt';assert pathlib.Path(d.value.path()).read_text()=='Bonjour test';print('PASS téléchargement natif sans blob mémoire')
