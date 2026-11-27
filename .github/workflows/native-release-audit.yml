@@ -1,0 +1,35 @@
+name: Audit du moteur Android publié
+on:
+  push:
+    branches: [audit/native-inference]
+permissions:
+  contents: read
+jobs:
+  published-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Télécharger et vérifier l’APK et le modèle
+        run: |
+          mkdir audit-data
+          cd audit-data
+          release=https://github.com/anderson76389/IA-Locale-Studio/releases/download/preview-2e2b2495c21f
+          curl -fLsS --retry 2 "$release/IA-Locale-Studio.apk" -o IA-Locale-Studio.apk
+          curl -fLsS --retry 2 "$release/SHA256SUMS.txt" | awk '$2 == "IA-Locale-Studio.apk"' | sha256sum -c -
+          sha=eb2c714d40d4b35ba4b8ee98475a06d51d8080a17d2d2a75a23665985c739b94
+          curl -fLsS --retry 2 "https://registry.ollama.ai/v2/library/smollm/blobs/sha256:$sha" -o model.gguf
+          printf '%s  model.gguf\n' "$sha" | sha256sum -c -
+      - name: Activer KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Générer hors ligne sous Android 15
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: python3 android/tests/release_inference_audit.py
