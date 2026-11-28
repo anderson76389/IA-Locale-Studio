@@ -40,13 +40,17 @@ def tap(node):
 adb("install", sys.argv[1])
 launch = adb("shell", "am", "start", "-W", "-n", f"{PACKAGE}/.MainActivity")
 assert "Status: ok" in launch, launch
-first = expect_workshop("Texte")
+first = view()
 tap(first["Choisir un modèle ▾"])
 assert "Importer un modèle GGUF" in view()
 adb("shell","input","keyevent","4")
-tap(first["Code"])
+tap(view()["☰"])
+tap(expect_workshop("Texte")["Code"])
+tap(view()["☰"])
 tap(expect_workshop("Code")["Texte"])
+tap(view()["☰"])
 expect_workshop("Texte")
+adb("shell", "input", "keyevent", "4")
 print("PASS : installation, démarrage et sélection native Texte → Code → Texte")
 
 # Exercise the same offline generation button as an installed user. The model is
@@ -74,8 +78,7 @@ adb("shell", "am", "start", "-W", "-n", f"{PACKAGE}/.MainActivity")
 adb("shell","wm","size","1080x2400")
 adb("shell","wm","density","320")
 for category, ext in [("Image","png"),("Vidéo","mp4"),("Musique","wav")]:
-    for _ in range(3):
-        adb("shell","input","swipe","400","400","400","1900","300")
+    tap(view()["☰"])
     tap(view()[category])
     nodes=view()
     model_button=next(node for node in nodes.values() if node.get("content-desc")=="Modèles locaux")
@@ -89,7 +92,7 @@ for category, ext in [("Image","png"),("Vidéo","mp4"),("Musique","wav")]:
         if paths.strip() and private("ls","-l",paths.strip()).strip():
             # The status is below the fold on some emulator sizes. Wait for
             # workshop navigation to unlock after the file and history commit.
-            if view().get(category,{}).get("enabled")=="true":break
+            if "Arrêter" not in view(): break
         time.sleep(1)
     else:raise AssertionError(f"{category} : {view()}")
     content=subprocess.check_output(["adb","exec-out","run-as",PACKAGE,"cat",paths.strip()])
