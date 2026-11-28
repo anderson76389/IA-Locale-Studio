@@ -13,7 +13,7 @@ static std::mutex execution;
 static void fail(JNIEnv *env, const char *msg) { env->ThrowNew(env->FindClass("java/lang/IllegalStateException"),msg); }
 extern "C" JNIEXPORT void JNICALL Java_fr_ialocale_mobile_MainActivity_resetStop(JNIEnv*,jclass){stopped=false;}
 extern "C" JNIEXPORT void JNICALL Java_fr_ialocale_mobile_MainActivity_stopNative(JNIEnv*,jclass){stopped=true;}
-extern "C" JNIEXPORT jbyteArray JNICALL Java_fr_ialocale_mobile_MainActivity_generateNative(JNIEnv *env,jclass,jstring path,jbyteArray input,jint max_tokens,jint threads) {
+extern "C" JNIEXPORT jbyteArray JNICALL Java_fr_ialocale_mobile_MainActivity_generateNative(JNIEnv *env,jclass,jstring path,jbyteArray input,jint max_tokens,jint threads,jstring grammar) {
   std::lock_guard<std::mutex> lock(execution);
   try {
     if(stopped) throw std::runtime_error("Generation annulee");
@@ -43,10 +43,17 @@ extern "C" JNIEXPORT jbyteArray JNICALL Java_fr_ialocale_mobile_MainActivity_gen
     if(!ctx) throw std::runtime_error("Contexte non disponible");
     llama_set_abort_callback(ctx.get(),[](void*)->bool{return stopped.load();},nullptr);
     if(llama_decode(ctx.get(),llama_batch_get_one(tokens.data(),tokens.size()))!=0) throw std::runtime_error(stopped?"Generation annulee":"Echec du calcul initial");
-    std::unique_ptr<llama_sampler,decltype(&llama_sampler_free)> sampler(llama_sampler_init_greedy(),llama_sampler_free);
+    std::unique_ptr<llama_sampler,decltype(&llama_sampler_free)> sampler(llama_sampler_chain_init(llama_sampler_chain_default_params()),llama_sampler_free);
+    if(grammar){
+      const char *rules=env->GetStringUTFChars(grammar,nullptr);if(!rules)return nullptr;
+      auto *constraint=llama_sampler_init_grammar(vocab,rules,"root");env->ReleaseStringUTFChars(grammar,rules);
+      if(!constraint)throw std::runtime_error("Format du média invalide");
+      llama_sampler_chain_add(sampler.get(),constraint);
+    }
+    llama_sampler_chain_add(sampler.get(),llama_sampler_init_greedy());
     if(!sampler) throw std::runtime_error("Echantillonneur non disponible");
     std::string out;
-    int limit=std::min({(int)max_tokens,512,2048-(int)tokens.size()});
+    int limit=std::min({(int)max_tokens,1024,2048-(int)tokens.size()});
     for(int i=0;i<limit && !stopped;i++){
       llama_token token=llama_sampler_sample(sampler.get(),ctx.get(),-1);
       if(llama_vocab_is_eog(vocab,token)) break;

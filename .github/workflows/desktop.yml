@@ -128,7 +128,7 @@ jobs:
               exit 0
             fi
           else
-            gh release create "$tag" --draft --prerelease --target "$GITHUB_SHA" --title "IA Locale Studio - Préversion ${GITHUB_SHA:0:12}" --notes "PC : moteurs Ollama et ComfyUI à installer localement. Android : Texte/Code CPU, modèles GGUF non inclus. Sans clé de publication configurée, signature debug et mises à jour Android en place non garanties. Tests CI, pas de validation physique GPU/téléphone."
+            gh release create "$tag" --draft --prerelease --target "$GITHUB_SHA" --title "IA Locale Studio - Préversion ${GITHUB_SHA:0:12}" --notes "PC : moteurs Ollama et ComfyUI à installer localement. Android : cinq ateliers sur CPU avec un GGUF local, à importer séparément. Sans clé de publication configurée, signature debug et mises à jour Android en place non garanties. Tests CI, pas de validation physique GPU/téléphone."
           fi
           gh release upload "$tag" release/IA-Locale-Studio.exe release/IA-Locale-Studio-Linux release/IA-Locale-Studio.apk release/SHA256SUMS.txt --clobber
           gh release view "$tag" --json assets --jq '.assets[].name' | sort > /tmp/published-assets

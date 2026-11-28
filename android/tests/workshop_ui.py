@@ -47,3 +47,59 @@ tap(first["Code"])
 tap(expect_workshop("Code")["Texte"])
 expect_workshop("Texte")
 print("PASS : installation, démarrage et sélection native Texte → Code → Texte")
+
+# Exercise the same offline generation button as an installed user. The model is
+# provisioned before launch so this test can run unattended on a clean emulator.
+import pathlib
+import struct
+import urllib.request
+
+model = pathlib.Path("smollm2-media-test.gguf")
+url = ("https://huggingface.co/bartowski/SmolLM2-135M-Instruct-GGUF/resolve/"
+       "09816acd5d99df7be770d85ea30822623dab342c/SmolLM2-135M-Instruct-Q4_K_M.gguf")
+urllib.request.urlretrieve(url, model)
+assert model.stat().st_size > 50000000
+adb("shell", "am", "force-stop", PACKAGE)
+adb("push", str(model), "/data/local/tmp/test.gguf")
+def private(*args):
+    return adb("shell", "run-as", PACKAGE, *args)
+private("mkdir", "-p", "files/models", "shared_prefs")
+private("cp", "/data/local/tmp/test.gguf", "files/models/test.gguf")
+prefs = pathlib.Path("studio-test-preferences.xml")
+prefs.write_text('<map><string name="model">test.gguf</string></map>')
+adb("push", str(prefs), "/data/local/tmp/studio-test.xml")
+private("cp", "/data/local/tmp/studio-test.xml", "shared_prefs/MainActivity.xml")
+adb("shell", "am", "start", "-W", "-n", f"{PACKAGE}/.MainActivity")
+adb("shell","wm","size","1080x2400")
+adb("shell","wm","density","320")
+for category, ext in [("Image","png"),("Vidéo","mp4"),("Musique","wav")]:
+    for _ in range(3):
+        adb("shell","input","swipe","400","400","400","1900","300")
+    tap(view()[category])
+    for _ in range(5):
+        nodes=view()
+        if "Tester hors ligne" in nodes:
+            tap(nodes["Tester hors ligne"])
+            break
+        adb("shell","input","swipe","400","1700","400","700","300")
+    else:
+        raise AssertionError("Bouton de test absent")
+    until=time.monotonic()+300
+    while time.monotonic()<until:
+        paths=private("find","files/creations","-name",f"creation.{ext}") if "creations" in private("ls","files") else ""
+        if "Création enregistrée" in str(view()) and paths.strip():
+            break
+        if paths.strip() and private("ls","-l",paths.strip()).strip():
+            # The status is below the fold on some emulator sizes. Wait for
+            # workshop navigation to unlock after the file and history commit.
+            if view().get(category,{}).get("enabled")=="true":break
+        time.sleep(1)
+    else:raise AssertionError(f"{category} : {view()}")
+    content=subprocess.check_output(["adb","exec-out","run-as",PACKAGE,"cat",paths.strip()])
+    if ext=="png":
+        assert content.startswith(b"\x89PNG") and struct.unpack(">II",content[16:24])==(768,768)
+    elif ext=="mp4":
+        assert b"ftyp" in content[:40] and b"moov" in content and b"avc1" in content
+    else:
+        assert content[:4]==b"RIFF" and content[8:12]==b"WAVE" and len(content)>10000
+    print("PASS génération GGUF réelle",category,len(content),"octets",flush=True)

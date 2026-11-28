@@ -25,7 +25,7 @@
 
 **Windows et Linux** ouvrent l’interface sur [localhost:1420](http://localhost:1420/). **Texte** et **Code** utilisent Ollama. **Image**, **Vidéo** et **Musique** utilisent ComfyUI avec un modèle et un workflow compatibles. Installe les moteurs et les modèles localement pour générer hors ligne. [Guide PC et compilation](desktop/README.md)
 
-**Android** embarque un moteur CPU pour **Texte** et **Code**. Les trois ateliers médias restent à intégrer sur Android. La signature de test peut empêcher une mise à jour par-dessus un APK précédent. [Guide Android et compilation](android/README.md)
+**Android** embarque un moteur CPU pour **Texte** et **Code**. Le même GGUF pilote trois ateliers de création locale : illustrations vectorielles PNG, animations MP4 de trois secondes et mélodies instrumentales WAV. Chaque atelier possède son historique et ses commandes de lecture, d’export et de suppression adaptées au format. La signature de test peut empêcher une mise à jour par-dessus un APK précédent. [Guide Android et compilation](android/README.md)
 
 Les versions publiées sont des préversions. Les essais avec génération réelle sur GPU et sur téléphone restent à effectuer. [Contrôles GitHub Actions](https://github.com/anderson76389/IA-Locale-Studio/actions) · [Empreintes SHA-256](https://github.com/anderson76389/IA-Locale-Studio/releases/download/preview-2e2b2495c21f/SHA256SUMS.txt)
 
