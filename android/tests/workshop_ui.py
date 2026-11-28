@@ -41,8 +41,9 @@ adb("install", sys.argv[1])
 launch = adb("shell", "am", "start", "-W", "-n", f"{PACKAGE}/.MainActivity")
 assert "Status: ok" in launch, launch
 first = expect_workshop("Texte")
-assert "Importer un modèle GGUF" in first
-assert "Aucun modèle installé" in first
+tap(first["Choisir un modèle ▾"])
+assert "Importer un modèle GGUF" in view()
+adb("shell","input","keyevent","4")
 tap(first["Code"])
 tap(expect_workshop("Code")["Texte"])
 expect_workshop("Texte")
@@ -76,14 +77,10 @@ for category, ext in [("Image","png"),("Vidéo","mp4"),("Musique","wav")]:
     for _ in range(3):
         adb("shell","input","swipe","400","400","400","1900","300")
     tap(view()[category])
-    for _ in range(5):
-        nodes=view()
-        if "Tester hors ligne" in nodes:
-            tap(nodes["Tester hors ligne"])
-            break
-        adb("shell","input","swipe","400","1700","400","700","300")
-    else:
-        raise AssertionError("Bouton de test absent")
+    nodes=view()
+    model_button=next(node for node in nodes.values() if node.get("content-desc")=="Modèles locaux")
+    tap(model_button)
+    tap(view()["Tester hors ligne"])
     until=time.monotonic()+300
     while time.monotonic()<until:
         paths=private("find","files/creations","-name",f"creation.{ext}") if "creations" in private("ls","files") else ""
