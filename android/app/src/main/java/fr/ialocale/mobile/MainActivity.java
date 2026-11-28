@@ -67,7 +67,7 @@ public final class MainActivity extends Activity {
     private int dp(int x){return (int)(getResources().getDisplayMetrics().density*x+.5f);}
     private TextView label(String s,int size){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(Color.WHITE);t.setPadding(0,dp(8),0,dp(8));return t;}
     private Button button(String s,View.OnClickListener listener){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setOnClickListener(listener);return b;}
-    @Override public void onCreate(Bundle b){super.onCreate(b);
+    @Override public void onCreate(Bundle savedState){super.onCreate(savedState);
         try{System.loadLibrary("ialocale");nativeReady=true;}catch(LinkageError e){nativeReady=false;}
         conversations=new Conversations(this);String previous=getPreferences(0).getString("model","");if(!previous.isEmpty()){File f=new File(getFilesDir(),"models/"+new File(previous).getName());if(f.isFile()) model=f;}
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);
