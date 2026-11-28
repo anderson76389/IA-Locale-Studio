@@ -38,7 +38,8 @@ def tap(node):
 
 
 adb("install", sys.argv[1])
-launch = adb("shell", "am", "start", "-W", "-n", f"{PACKAGE}/.MainActivity")
+launch = adb("shell", "am", "start", "-W", "-a", "android.intent.action.MAIN",
+    "-c", "android.intent.category.LAUNCHER", "-f", "0x10200000", "-n", f"{PACKAGE}/.MainActivity")
 assert "Status: ok" in launch, launch
 first = view()
 tap(first["Choisir un modèle ▾"])
@@ -74,7 +75,8 @@ prefs = pathlib.Path("studio-test-preferences.xml")
 prefs.write_text('<map><string name="model">test.gguf</string></map>')
 adb("push", str(prefs), "/data/local/tmp/studio-test.xml")
 private("cp", "/data/local/tmp/studio-test.xml", "shared_prefs/MainActivity.xml")
-adb("shell", "am", "start", "-W", "-n", f"{PACKAGE}/.MainActivity")
+adb("shell", "am", "start", "-W", "-a", "android.intent.action.MAIN",
+    "-c", "android.intent.category.LAUNCHER", "-f", "0x10200000", "-n", f"{PACKAGE}/.MainActivity")
 adb("shell","wm","size","1080x2400")
 adb("shell","wm","density","320")
 for category, ext in [("Image","png"),("Vidéo","mp4"),("Musique","wav")]:
@@ -116,3 +118,53 @@ adb("shell", "input", "keyevent", *(["67"] * len("introuvable")))
 tap(view()["Une mélodie au piano"])
 assert "Exporter la création" in view()
 print("PASS : recherche, nouvelle discussion et reprise de la création")
+
+
+def open_workshop(name):
+    tap(view()["☰"])
+    tap(view()[name])
+
+
+def enter_prompt(text):
+    editor = next(node for node in view().values()
+                  if node["class"] == "android.widget.EditText")
+    tap(editor)
+    adb("shell", "input", "text", text.replace(" ", "%s"))
+    adb("shell", "input", "keyevent", "4")
+
+
+def generate_reply(question):
+    enter_prompt(question)
+    tap(view()["↑"])
+    until = time.monotonic() + 300
+    while time.monotonic() < until:
+        nodes = view()
+        if question in nodes and "Arrêter" not in nodes:
+            if any(node.get("class") == "android.widget.EditText" and text != question
+                   for text, node in nodes.items()):
+                return
+        time.sleep(1)
+    raise AssertionError(f"Demande sans réponse : {question} : {view()}")
+
+
+for category, question in [("Texte", "Reply with OK"), ("Code", "Print 42 in Python")]:
+    open_workshop(category)
+    generate_reply(question)
+    tap(view()["☰"])
+    nodes = expect_workshop(category)
+    tap(nodes[question])
+    assert question in view()
+    print("PASS : envoi et reprise", category, flush=True)
+
+enter_prompt("Brouillon mobile")
+# A background process kill retains the task, like Android reclaiming memory.
+adb("shell", "input", "keyevent", "3")
+time.sleep(2)
+adb("shell", "am", "kill", PACKAGE)
+pid = subprocess.run(["adb", "shell", "pidof", PACKAGE], capture_output=True, text=True)
+assert pid.returncode == 1 and not pid.stdout.strip(), pid
+adb("shell", "am", "start", "-W", "-a", "android.intent.action.MAIN",
+    "-c", "android.intent.category.LAUNCHER", "-f", "0x10200000", "-n", f"{PACKAGE}/.MainActivity")
+restored = view()
+assert "Brouillon mobile" in restored and "Print 42 in Python" in restored, restored
+print("PASS : discussion et brouillon restaurés après arrêt du processus")
