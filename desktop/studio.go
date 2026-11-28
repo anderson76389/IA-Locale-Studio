@@ -850,6 +850,12 @@ func launchBrowser(addr string) {
 func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
+		case "--install-launcher":
+			if err := installLinuxLauncher(); err != nil {
+				fmt.Fprintln(os.Stderr, err)
+				os.Exit(1)
+			}
+			return
 		case "backup", "restore", "verify":
 			backupMain()
 			return
@@ -887,7 +893,7 @@ func main() {
 		os.Exit(1)
 	}
 	addr := fmt.Sprintf("http://localhost:%d/", l.Addr().(*net.TCPAddr).Port)
-	fmt.Println("IA Locale Studio — édition de consolidation", addr, "\nDonnées :", p)
+	fmt.Println("IA Locale Studio", addr, "\nDonnées :", p)
 	if !*noBrowser {
 		launchBrowser(addr)
 	}

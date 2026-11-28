@@ -53,6 +53,11 @@ jobs:
         run: go test -race -count=1 ./...
       - name: Vérifier JavaScript
         run: node --check desktop/web/app.js
+      - name: Intégrer le nom et l’icône Windows
+        if: runner.os == 'Windows'
+        working-directory: desktop
+        shell: bash
+        run: windres --target=pe-x86-64 studio.rc -O coff -o studio_windows_amd64.syso
       - name: Compiler un exécutable autonome
         working-directory: desktop
         shell: bash
@@ -61,6 +66,24 @@ jobs:
         run: |
           mkdir -p ../dist
           go build -trimpath -ldflags="-s -w" -o "../dist/${{ matrix.binary }}" .
+      - name: Vérifier le nom et l’icône de l’EXE
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $binary = Get-Item dist/IA-Locale-Studio.exe
+          if ($binary.VersionInfo.ProductName -ne 'IA Locale Studio') { throw 'Nom du produit incorrect' }
+          Add-Type -AssemblyName System.Drawing
+          $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($binary.FullName)
+          if ($null -eq $icon) { throw 'Icône absente' }
+          $icon.Dispose()
+      - name: Vérifier le lanceur Linux
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          export XDG_DATA_HOME="$RUNNER_TEMP/studio-launcher"
+          ./dist/IA-Locale-Studio-Linux --install-launcher
+          cmp desktop/web/studio-icon.svg "$XDG_DATA_HOME/icons/hicolor/scalable/apps/fr.ialocale.studio.svg"
+          grep -Fx 'Name=IA Locale Studio' "$XDG_DATA_HOME/applications/fr.ialocale.studio.desktop"
       - name: Test HTTP de l’exécutable
         run: python desktop/ci_smoke.py "dist/${{ matrix.binary }}"
       - name: Test des fichiers d’interface et du serveur Linux
