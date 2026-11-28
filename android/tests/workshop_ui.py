@@ -103,3 +103,16 @@ for category, ext in [("Image","png"),("Vidéo","mp4"),("Musique","wav")]:
     else:
         assert content[:4]==b"RIFF" and content[8:12]==b"WAVE" and len(content)>10000
     print("PASS génération GGUF réelle",category,len(content),"octets",flush=True)
+
+# Reopen the generated music from a filtered history after starting a fresh chat.
+tap(view()["☰"])
+tap(view()["Nouvelle discussion"])
+tap(view()["☰"])
+search = view()["Rechercher une discussion"]
+tap(search)
+adb("shell", "input", "text", "introuvable")
+assert "Aucun résultat" in view()
+adb("shell", "input", "keyevent", *(["67"] * len("introuvable")))
+tap(view()["Une mélodie au piano"])
+assert "Exporter la création" in view()
+print("PASS : recherche, nouvelle discussion et reprise de la création")

@@ -104,11 +104,12 @@ public final class MainActivity extends Activity {
             bubble.gravity = android.view.Gravity.END;
             bubble.setMargins(dp(34), dp(12), 0, dp(6));
             messages.addView(question, bubble);
+            if (messages.getChildCount() == 1) brand.setText(turn[0]);
+            if (media()) continue;
             TextView answer = label(turn[1], 17);
             answer.setTextIsSelectable(true);
             answer.setLineSpacing(dp(3), 1);
             messages.addView(answer);
-            if (messages.getChildCount() == 2) brand.setText(turn[0]);
         }
     }
 
@@ -169,6 +170,7 @@ public final class MainActivity extends Activity {
             public void afterTextChanged(android.text.Editable e) {}
         });
         filter.run();
+        drawer.setOnDismissListener(d -> { if (drawer == d) { tabs.clear(); drawer = null; } });
         drawer.setContentView(panel);
         android.view.Window window = drawer.getWindow();
         window.setBackgroundDrawableResource(android.R.color.transparent);
@@ -401,7 +403,7 @@ public final class MainActivity extends Activity {
                     String id=java.util.UUID.randomUUID().toString();File dir=creation(id);
                     File file=MediaWorkshop.render(dir,kind,answer,cancelled::get);
                     try{conversations.add(kind,id,q,file.getName());}catch(Exception e){Attachments.erase(dir);throw e;}
-                    runOnUiThread(()->{if(isDestroyed())return;thread=id;output.setText(q);preview(file);finishJob("Création enregistrée · "+file.getName());});
+                    runOnUiThread(()->{if(isDestroyed())return;thread=id;renderMessages();preview(file);finishJob("Création enregistrée · "+file.getName());});
                     return;
                 }
                 runOnUiThread(()->{if(isDestroyed())return;if(!test){
