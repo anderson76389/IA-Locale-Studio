@@ -102,3 +102,5 @@ MODE HORS LIGNE
 - Les nouveaux tests réseau utilisent des transports et moteurs simulés. Aucun
   modèle réel n'a été téléchargé ni exécuté sur GPU physique. Le registre réel
   n'a pas été vérifié. Le test navigateur précédent n'a pas été réexécuté.
+
+Sous Linux, lance `./IA-Locale-Studio-Linux --install-launcher` depuis son dossier définitif pour ajouter IA Locale Studio et son icône au menu des applications.

@@ -113,7 +113,11 @@ public final class MainActivity extends Activity {
         Button historyButton = button("☰", v -> history());
         historyButton.setContentDescription("Historique");
         header.addView(historyButton, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        TextView brand = label("IA Locale Studio", 21);
+        TextView brand = label(getString(R.string.app_name), 19);
+        Drawable emblem = getDrawable(R.drawable.studio_icon);
+        emblem.setBounds(0, 0, dp(28), dp(28));
+        brand.setCompoundDrawablesRelative(emblem, null, null, null);
+        brand.setCompoundDrawablePadding(dp(4));
         brand.setGravity(android.view.Gravity.CENTER);
         header.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
         Button fresh = button("＋", v -> {
