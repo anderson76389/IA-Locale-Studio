@@ -74,7 +74,9 @@ jobs:
         shell: pwsh
         run: |
           $binary = Get-Item dist/IA-Locale-Studio.exe
-          if ($binary.VersionInfo.ProductName -ne 'IA Locale Studio') { throw 'Nom du produit incorrect' }
+          python -m pip install --quiet pefile==2024.8.26
+          python -c "import pefile; p=pefile.PE('dist/IA-Locale-Studio.exe'); tables=[t.entries for group in p.FileInfo for item in group for t in getattr(item,'StringTable',[])]; print(tables); assert any(t.get(b'ProductName')==b'IA Locale Studio' for t in tables); assert {3,14,16} <= {e.id for e in p.DIRECTORY_ENTRY_RESOURCE.entries}"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
           Add-Type -AssemblyName System.Drawing
           $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($binary.FullName)
           if ($null -eq $icon) { throw 'Icône absente' }
