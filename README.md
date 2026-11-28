@@ -10,11 +10,11 @@
 
 </div>
 
-| Plateforme | Téléchargement direct de la préversion `aa7b3c06662d` | Démarrage |
+| Plateforme | Téléchargement direct de la préversion `fa0b07a60dea` | Démarrage |
 | --- | --- | --- |
-| **Windows x64** | [**Télécharger le .exe**](https://github.com/anderson76389/IA-Locale-Studio/releases/download/preview-aa7b3c06662d/IA-Locale-Studio.exe) | Place le fichier dans un dossier dédié et lance-le. |
-| **Linux x64** | [**Télécharger le binaire Linux**](https://github.com/anderson76389/IA-Locale-Studio/releases/download/preview-aa7b3c06662d/IA-Locale-Studio-Linux) | Exécute `chmod +x IA-Locale-Studio-Linux`, puis `./IA-Locale-Studio-Linux`. |
-| **Android 8+** | [**Télécharger l’APK**](https://github.com/anderson76389/IA-Locale-Studio/releases/download/preview-aa7b3c06662d/IA-Locale-Studio.apk) | Installe l’APK ARM64/x86-64 et importe un modèle GGUF. |
+| **Windows x64** | [**Télécharger le .exe**](https://github.com/anderson76389/IA-Locale-Studio/releases/download/preview-fa0b07a60dea/IA-Locale-Studio.exe) | Place le fichier dans un dossier dédié et lance-le. |
+| **Linux x64** | [**Télécharger le binaire Linux**](https://github.com/anderson76389/IA-Locale-Studio/releases/download/preview-fa0b07a60dea/IA-Locale-Studio-Linux) | Exécute `chmod +x IA-Locale-Studio-Linux`, puis `./IA-Locale-Studio-Linux`. |
+| **Android 8+** | [**Télécharger l’APK**](https://github.com/anderson76389/IA-Locale-Studio/releases/download/preview-fa0b07a60dea/IA-Locale-Studio.apk) | Installe l’APK ARM64/x86-64 et importe un modèle GGUF. |
 
 ## L’interface
 
@@ -27,7 +27,7 @@
 
 **Android** embarque un moteur CPU pour **Texte** et **Code**. Le même GGUF pilote trois ateliers de création locale : illustrations vectorielles PNG, animations MP4 de trois secondes et mélodies instrumentales WAV. Chaque atelier possède son historique et ses commandes de lecture, d’export et de suppression adaptées au format. La signature de test peut empêcher une mise à jour par-dessus un APK précédent. [Guide Android et compilation](android/README.md)
 
-Les versions publiées sont des préversions. Les essais avec génération réelle sur GPU et sur téléphone restent à effectuer. [Contrôles GitHub Actions](https://github.com/anderson76389/IA-Locale-Studio/actions) · [Empreintes SHA-256](https://github.com/anderson76389/IA-Locale-Studio/releases/download/preview-aa7b3c06662d/SHA256SUMS.txt)
+Les versions publiées sont des préversions. Les essais avec génération réelle sur GPU et sur téléphone restent à effectuer. [Contrôles GitHub Actions](https://github.com/anderson76389/IA-Locale-Studio/actions) · [Empreintes SHA-256](https://github.com/anderson76389/IA-Locale-Studio/releases/download/preview-fa0b07a60dea/SHA256SUMS.txt)
 
 ### Historique et pièces jointes
 
