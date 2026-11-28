@@ -1,0 +1,48 @@
+name: Générations PC avec modèles locaux
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'tests/engines/**'
+      - '.github/workflows/real-pc.yml'
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 45
+    env:
+      PYTHONUTF8: "1"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compiler le Studio Windows
+        working-directory: desktop
+        run: go build -o ../studio.exe .
+      - name: Installer ComfyUI et les dépendances CPU
+        run: |
+          git clone -q --depth 1 --branch v0.3.66 https://github.com/Comfy-Org/ComfyUI.git ComfyUI
+          python -m pip install torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -r ComfyUI/requirements.txt "transformers==4.57.6" diffusers==0.35.2 accelerate
+      - name: Préparer Ollama et les trois modèles locaux
+        run: |
+          curl.exe -fsSL --retry 3 https://github.com/ollama/ollama/releases/download/v0.6.8/ollama-windows-amd64.zip -o ollama.zip
+          mkdir engine
+          tar -xf ollama.zip -C engine --exclude '*cuda*' --exclude '*rocm*'
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Remove-Item ollama.zip
+          python tests/engines/models.py
+      - name: Générer puis décoder les sorties des cinq ateliers
+        run: python tests/engines/verify.py --studio studio.exe --ollama engine/ollama.exe --comfy ComfyUI --models .
+      - name: Diagnostic des moteurs
+        if: failure()
+        run: |
+          Get-ChildItem *-validation.log | ForEach-Object { Get-Content $_ -Tail 100 }
