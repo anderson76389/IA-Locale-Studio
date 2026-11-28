@@ -268,6 +268,7 @@ public final class MainActivity extends Activity {
         prompt.setHintTextColor(0xffc5bdce);
         prompt.setMinLines(1);
         prompt.setMaxLines(3);
+        prompt.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(6000)});
         prompt.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
         composer.addView(prompt);
         LinearLayout actions = new LinearLayout(this);
@@ -286,7 +287,33 @@ public final class MainActivity extends Activity {
         videoPreview=new VideoView(this);root.addView(videoPreview,new LinearLayout.LayoutParams(-1,dp(220)));
         playMedia=button("Lire la création",v->play());root.addView(playMedia);
         saveMedia=button("Exporter la création",v->export());root.addView(saveMedia);
-        setContentView(screen);preview(null);select("Texte");refresh();refreshNetwork();
+        setContentView(screen);
+        preview(null);
+        select(savedState == null ? "Texte" : savedState.getString("workshop", "Texte"));
+        if (savedState != null) {
+            thread = savedState.getString("thread");
+            if (thread != null) {
+                renderMessages();
+                if (media()) {
+                    File file = new File(creation(thread), "creation." + MediaWorkshop.extension(workshop));
+                    if (file.isFile()) preview(file);
+                }
+            }
+            prompt.setText(savedState.getString("draft", ""));
+            prompt.setSelection(prompt.length());
+            if (savedState.getBoolean("exporting")) exporting = currentMedia;
+        }
+        refresh();
+        refreshNetwork();
+    }
+
+    @Override protected void onSaveInstanceState(Bundle state) {
+        super.onSaveInstanceState(state);
+        state.putString("workshop", workshop);
+        state.putString("thread", thread);
+        // Android transports activity state in a size-limited Binder transaction.
+        state.putString("draft", prompt.getText().subSequence(0, Math.min(prompt.length(), 6000)).toString());
+        state.putBoolean("exporting", exporting != null);
     }
     private Button speechAction;
 
