@@ -57,7 +57,7 @@ jobs:
         if: runner.os == 'Windows'
         working-directory: desktop
         shell: bash
-        run: windres --target=pe-x86-64 studio.rc -O coff -o studio_windows_amd64.syso
+        run: go run github.com/josephspurrier/goversioninfo/cmd/goversioninfo@v1.4.1 -64 -o studio_windows_amd64.syso versioninfo.json
       - name: Compiler un exécutable autonome
         working-directory: desktop
         shell: bash
