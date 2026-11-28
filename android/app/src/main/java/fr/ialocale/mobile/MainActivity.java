@@ -103,49 +103,139 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle savedState){super.onCreate(savedState);
         try{System.loadLibrary("ialocale");nativeReady=true;}catch(LinkageError e){nativeReady=false;}
         conversations=new Conversations(this);String previous=getPreferences(0).getString("model","");if(!previous.isEmpty()){File f=new File(getFilesDir(),"models/"+new File(previous).getName());if(f.isFile()) model=f;}
-        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);
-        LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);root.setPadding(dp(20),dp(32),dp(20),dp(24));root.setBackgroundColor(0xff111521);scroll.addView(root);
-        root.addView(label("IA Locale Studio",28));root.addView(label("Android • Calcul local CPU",15));connection=label("",14);root.addView(connection);
-        root.addView(createWorkshopBar());
-
-        modelLabel=label("",14);root.addView(modelLabel);pick=button("Importer un modèle GGUF",v->{if(busy)return;Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,PICK);});root.addView(pick);
-        download=button("Télécharger un modèle sur Hugging Face",v->{refreshNetwork();if(!online()){state.setText("Vous êtes hors ligne. Connectez-vous pour télécharger un modèle. Les modèles installés restent utilisables.");return;}try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://huggingface.co/models?library=gguf")));}catch(Exception e){state.setText("Aucun navigateur disponible.");}});root.addView(download);
-        root.addView(button("Gérer les modèles",v->models()));
-        root.addView(button("Historique",v->history()));
-        root.addView(button("Nouvelle discussion",v->{if(!busy){thread=null;preview(null);output.setText("");prompt.setText("");}}));
-        root.addView(button("Tester hors ligne",v->{if(model==null){state.setText("Importez un modèle GGUF pour le test.");return;}start(true);}));
-        root.addView(button("Joindre un document, une image ou un audio",v->{
-            if(busy)return;Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"text/*","application/json","image/*","audio/*","video/*"});startActivityForResult(i,41);
-        }));
-        root.addView(button("Modèle de transcription Vosk",v->{
+        LinearLayout screen = column();
+        screen.setBackgroundColor(0xff11121a);
+        screen.setPadding(dp(12), dp(6), dp(12), dp(8));
+        screen.setFitsSystemWindows(true);
+        getWindow().setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(android.view.Gravity.CENTER_VERTICAL);
+        Button historyButton = button("☰", v -> history());
+        historyButton.setContentDescription("Historique");
+        header.addView(historyButton, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        TextView brand = label("IA Locale Studio", 21);
+        brand.setGravity(android.view.Gravity.CENTER);
+        header.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
+        Button fresh = button("＋", v -> {
+            if (busy) return;
+            thread = null;
+            preview(null);
+            output.setText("");
+            prompt.setText("");
+            state.setText("Prêt");
+        });
+        fresh.setContentDescription("Nouvelle discussion");
+        header.addView(fresh, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        screen.addView(header);
+        screen.addView(createWorkshopBar());
+        modelLabel = label("", 14);
+        modelLabel.setGravity(android.view.Gravity.CENTER);
+        modelLabel.setMinHeight(dp(48));
+        modelLabel.setOnClickListener(v -> showModelMenu());
+        modelLabel.setFocusable(true);
+        screen.addView(modelLabel);
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(true);
+        LinearLayout root = column();
+        root.setPadding(dp(12), dp(4), dp(12), dp(8));
+        scroll.addView(root);
+        screen.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        connection = label("", 12);
+        root.addView(connection);
+        state = label("Prêt", 14);
+        root.addView(state);
+        output = label("", 17);
+        output.setLineSpacing(dp(3), 1);
+        output.setTextIsSelectable(true);
+        root.addView(output);
+        pick=button("Importer un modèle GGUF",v->{if(busy)return;Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,PICK);});
+        download=button("Télécharger un modèle sur Hugging Face",v->{refreshNetwork();if(!online()){state.setText("Vous êtes hors ligne. Connectez-vous pour télécharger un modèle. Les modèles installés restent utilisables.");return;}try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://huggingface.co/models?library=gguf")));}catch(Exception e){state.setText("Aucun navigateur disponible.");}});
+        Button attachment = button("＋", v -> {
+            if (busy) return;
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            intent.setType("*/*");
+            intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"text/*","application/json","image/*","audio/*","video/*"});
+            startActivityForResult(intent, 41);
+        });
+        attachment.setContentDescription("Joindre un document, une image ou un audio");
+        speechAction = button("Modèle de transcription Vosk", v->{
             if(busy)return;
             File vocal=Attachments.speechModel(this);
             if(vocal.isDirectory()){
                 new android.app.AlertDialog.Builder(this).setMessage("Supprimer le modèle vocal installé ?")
                 .setPositiveButton("Supprimer",(a,b)->state.setText(Attachments.erase(vocal)?"Modèle vocal supprimé.":"Suppression incomplète.")).setNegativeButton("Annuler",null).show();
             }else{Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");startActivityForResult(i,42);}
-        }));
-        root.addView(label("Demande",16));prompt=new EditText(this);prompt.setHint("Écrire une demande…");prompt.setTextColor(Color.WHITE);prompt.setHintTextColor(0xffa5aabb);prompt.setMinLines(4);root.addView(prompt);
-        run=button("Générer localement",v->start(false));root.addView(run);stop=button("Arrêter",v->{cancelled.set(true);if(nativeReady)stopNative();state.setText("Arrêt demandé…");});root.addView(stop);state=label("Prêt",14);root.addView(state);output=label("",16);output.setTextIsSelectable(true);root.addView(output);
+        });
+        LinearLayout composer = column();
+        composer.setPadding(dp(10), dp(5), dp(10), dp(6));
+        composer.setBackground(glassGradient(22, 0xff302b42, 0xff201f2d));
+        prompt = new EditText(this);
+        prompt.setBackgroundColor(Color.TRANSPARENT);
+        prompt.setTextColor(Color.WHITE);
+        prompt.setHintTextColor(0xffc5bdce);
+        prompt.setMinLines(1);
+        prompt.setMaxLines(3);
+        prompt.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+        composer.addView(prompt);
+        LinearLayout actions = new LinearLayout(this);
+        actions.addView(attachment, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        run = button("Générer localement", v -> start(false));
+        actions.addView(run, new LinearLayout.LayoutParams(0, -2, 1));
+        stop = button("Arrêter", v -> {cancelled.set(true);if(nativeReady)stopNative();state.setText("Arrêt demandé…");});
+        actions.addView(stop);
+        composer.addView(actions);
+        screen.addView(composer);
+        screen.setFocusableInTouchMode(true);
+        screen.requestFocus();
         imagePreview=new ImageView(this);imagePreview.setAdjustViewBounds(true);root.addView(imagePreview);
         videoPreview=new VideoView(this);root.addView(videoPreview,new LinearLayout.LayoutParams(-1,dp(220)));
         playMedia=button("Lire la création",v->play());root.addView(playMedia);
         saveMedia=button("Exporter la création",v->export());root.addView(saveMedia);
-        setContentView(scroll);preview(null);select("Texte");refresh();refreshNetwork();
+        setContentView(screen);preview(null);select("Texte");refresh();refreshNetwork();
     }
+    private Button speechAction;
+
+    private LinearLayout column() {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        return layout;
+    }
+
+    private void showModelMenu() {
+        if (busy) return;
+        String[] items = {"Importer un modèle GGUF", "Gérer les modèles", "Télécharger un modèle sur Hugging Face",
+                          "Modèle de transcription Vosk", "Tester hors ligne"};
+        new android.app.AlertDialog.Builder(this).setTitle("Modèles locaux").setItems(items, (dialog, index) -> {
+            switch (index) {
+                case 0: pick.performClick(); break;
+                case 1: models(); break;
+                case 2: download.performClick(); break;
+                case 3: speechAction.performClick(); break;
+                case 4:
+                    if (model == null) state.setText("Importez un modèle GGUF pour le test.");
+                    else start(true);
+                    break;
+            }
+        }).setNegativeButton("Fermer", null).show();
+    }
+
     private LinearLayout createWorkshopBar() {
         LinearLayout bar = new LinearLayout(this);
         bar.setOrientation(LinearLayout.HORIZONTAL);
         bar.setPadding(dp(6), dp(6), dp(6), dp(6));
         bar.setBackground(glassGradient(24, 0xff4b435f, 0xff251f35, 0xff302940));
         bar.setElevation(dp(5));
-        LinearLayout column=new LinearLayout(this);column.setOrientation(LinearLayout.VERTICAL);column.addView(bar);
-        LinearLayout lower=new LinearLayout(this);column.addView(lower);
+        HorizontalScrollView strip = new HorizontalScrollView(this);
+        strip.setHorizontalScrollBarEnabled(false);
+        strip.setFillViewport(true);
+        strip.addView(bar);
+        LinearLayout container = column();
+        container.addView(strip);
         for(String title:new String[]{"Texte","Code","Image","Vidéo","Musique"}){
             Button tab=workshopButton(title,0xff544c78,0xff302940);
-            (tabs.size()<2?bar:lower).addView(tab,new LinearLayout.LayoutParams(0,-2,1));tabs.put(title,tab);
+            tab.setTextSize(14);tab.setMinWidth(dp(58));tab.setMinimumWidth(dp(58));bar.addView(tab,new LinearLayout.LayoutParams(-2,-2,1));tabs.put(title,tab);
         }
-        return column;
+        return container;
     }
 
     private Button workshopButton(String title, int highlight, int base) {
@@ -184,7 +274,7 @@ public final class MainActivity extends Activity {
     private boolean online(){ConnectivityManager cm=(ConnectivityManager)getSystemService(Context.CONNECTIVITY_SERVICE);NetworkCapabilities caps=cm.getNetworkCapabilities(cm.getActiveNetwork());return caps!=null&&caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);}
     private void refreshNetwork(){connection.setText(online()?"En ligne · calcul toujours local":"Hors ligne · modèles installés utilisables");}
     @Override protected void onResume(){super.onResume();if(connection!=null)refreshNetwork();}
-    private void refresh(){modelLabel.setText(model==null?"Aucun modèle installé":display(model)+" · "+(model.length()/1048576)+" Mio");run.setEnabled(nativeReady&&!busy&&model!=null);pick.setEnabled(!busy);download.setEnabled(!busy);stop.setEnabled(busy);select(workshop);if(!nativeReady)state.setText("Moteur natif non chargé. La génération est indisponible.");}
+    private void refresh(){modelLabel.setText(model==null?"Choisir un modèle ▾":display(model)+" ▾");modelLabel.setContentDescription("Modèles locaux");modelLabel.setEnabled(!busy);stop.setVisibility(busy?View.VISIBLE:View.GONE);run.setEnabled(nativeReady&&!busy&&model!=null);pick.setEnabled(!busy);download.setEnabled(!busy);stop.setEnabled(busy);select(workshop);if(!nativeReady)state.setText("Moteur natif non chargé. La génération est indisponible.");}
     @Override protected void onActivityResult(int req,int result,Intent data){super.onActivityResult(req,result,data);
         if(req==43){
             File source=exporting;exporting=null;
