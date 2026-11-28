@@ -27,6 +27,9 @@ public final class MainActivity extends Activity {
     private File model;
     private Conversations conversations;
     private String thread;
+    private LinearLayout messages;
+    private TextView brand;
+    private android.app.Dialog drawer;
     private String workshop="Texte";
     private final java.util.Map<String,Button> tabs=new java.util.LinkedHashMap<>();
     private File currentMedia,exporting;
@@ -80,30 +83,115 @@ public final class MainActivity extends Activity {
                 }).setNeutralButton("Annuler",null).show();
             }).show();
     }
-    private void history(){
-        if(busy)return;
-        java.util.ArrayList<String[]> rows=conversations.list(category());
-        if(rows.isEmpty()){state.setText("Aucune discussion dans cet atelier.");return;}
-        String[] titles=new String[rows.size()];
-        for(int i=0;i<titles.length;i++){String title=rows.get(i)[1];titles[i]=title.substring(0,Math.min(70,title.length()));}
-        new android.app.AlertDialog.Builder(this).setTitle("Historique · "+category()).setItems(titles,(a,i)->{
-            String selected=rows.get(i)[0];
-            new android.app.AlertDialog.Builder(this).setTitle(titles[i])
-                .setPositiveButton("Reprendre",(x,y)->{thread=selected;output.setText(conversations.read(thread));prompt.setText("");if(media())preview(new File(creation(thread),"creation."+MediaWorkshop.extension(workshop)));})
-                .setNegativeButton("Supprimer définitivement",(x,y)->{if(media()&&!Attachments.erase(creation(selected))){state.setText("Suppression du fichier impossible.");return;}conversations.remove(selected);if(selected.equals(thread)){thread=null;preview(null);output.setText("");prompt.setText("");}})
-                .setNeutralButton("Annuler",null).show();
-        }).show();
+    private void newConversation() {
+        thread = null;
+        preview(null);
+        output.setText("");
+        messages.removeAllViews();
+        prompt.setText("");
+        state.setText("");
+        brand.setText(workshop.equals("Texte") ? getString(R.string.app_name) : workshop);
+    }
+
+    private void renderMessages() {
+        messages.removeAllViews();
+        for (String[] turn : conversations.turns(thread)) {
+            TextView question = label(turn[0], 16);
+            question.setTextIsSelectable(true);
+            question.setPadding(dp(16), dp(10), dp(16), dp(10));
+            question.setBackground(glassGradient(18, 0xff49405d, 0xff403650));
+            LinearLayout.LayoutParams bubble = new LinearLayout.LayoutParams(-2, -2);
+            bubble.gravity = android.view.Gravity.END;
+            bubble.setMargins(dp(34), dp(12), 0, dp(6));
+            messages.addView(question, bubble);
+            if (messages.getChildCount() == 1) brand.setText(turn[0]);
+            if (media()) continue;
+            TextView answer = label(turn[1], 17);
+            answer.setTextIsSelectable(true);
+            answer.setLineSpacing(dp(3), 1);
+            messages.addView(answer);
+        }
+    }
+
+    private void history() {
+        if (busy) return;
+        drawer = new android.app.Dialog(this);
+        LinearLayout panel = column();
+        panel.setBackgroundColor(0xff211e29);
+        panel.setPadding(dp(14), dp(16), dp(14), dp(12));
+        panel.setFocusableInTouchMode(true);
+        panel.addView(label("Conversations", 22));
+        panel.addView(createWorkshopBar());
+        select(workshop);
+        EditText search = new EditText(this);
+        search.setSingleLine();
+        search.setHint("Rechercher une discussion");
+        panel.addView(search);
+        panel.addView(button("Nouvelle discussion", v -> { newConversation(); drawer.dismiss(); }));
+        ScrollView list = new ScrollView(this);
+        LinearLayout rows = column();
+        list.addView(rows);
+        panel.addView(list, new LinearLayout.LayoutParams(-1, 0, 1));
+        java.util.ArrayList<String[]> entries = conversations.list(category());
+        Runnable filter = () -> {
+            rows.removeAllViews();
+            String term = search.getText().toString().toLowerCase(java.util.Locale.ROOT);
+            for (String[] row : entries) {
+                if (!row[1].toLowerCase(java.util.Locale.ROOT).contains(term)) continue;
+                Button item = button(row[1], v -> {
+                    newConversation();
+                    thread = row[0];
+                    renderMessages();
+                    if (media()) preview(new File(creation(thread), "creation." + MediaWorkshop.extension(workshop)));
+                    drawer.dismiss();
+                });
+                item.setSingleLine();
+                item.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                item.setGravity(android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL);
+                item.setOnLongClickListener(v -> {
+                    new android.app.AlertDialog.Builder(this).setMessage("Supprimer cette discussion ?")
+                        .setNegativeButton("Annuler", null).setPositiveButton("Supprimer", (d, i) -> {
+                            if (media() && !Attachments.erase(creation(row[0]))) {
+                                drawer.dismiss(); state.setText("Suppression du fichier impossible."); return;
+                            }
+                            conversations.remove(row[0]);
+                            if (row[0].equals(thread)) newConversation();
+                            drawer.dismiss(); history();
+                        }).show();
+                    return true;
+                });
+                rows.addView(item);
+            }
+            if (rows.getChildCount() == 0) rows.addView(label(term.isEmpty() ? "Aucune discussion dans cet atelier" : "Aucun résultat", 14));
+        };
+        search.addTextChangedListener(new android.text.TextWatcher() {
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            public void onTextChanged(CharSequence s, int start, int before, int count) { filter.run(); }
+            public void afterTextChanged(android.text.Editable e) {}
+        });
+        filter.run();
+        drawer.setOnDismissListener(d -> { if (drawer == d) { tabs.clear(); drawer = null; } });
+        drawer.setContentView(panel);
+        android.view.Window window = drawer.getWindow();
+        window.setBackgroundDrawableResource(android.R.color.transparent);
+        window.setGravity(android.view.Gravity.START);
+        window.setLayout(Math.min(dp(380), getResources().getDisplayMetrics().widthPixels - dp(32)), -1);
+        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+                | android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        drawer.show();
     }
     private static native byte[] generateNative(String path, byte[] input, int maxTokens, int threads, String grammar);
     private static native void resetStop();
     private static native void stopNative();
     private int dp(int x){return (int)(getResources().getDisplayMetrics().density*x+.5f);}
     private TextView label(String s,int size){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(Color.WHITE);t.setPadding(0,dp(8),0,dp(8));return t;}
-    private Button button(String s,View.OnClickListener listener){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setOnClickListener(listener);return b;}
+    private Button button(String s,View.OnClickListener listener){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setPadding(dp(8),0,dp(8),0);b.setMinWidth(0);b.setMinimumWidth(0);b.setBackground(new RippleDrawable(ColorStateList.valueOf(0x30ffffff),glassGradient(22,0xff373240,0xff302c38),null));b.setOnClickListener(listener);return b;}
     @Override public void onCreate(Bundle savedState){super.onCreate(savedState);
         try{System.loadLibrary("ialocale");nativeReady=true;}catch(LinkageError e){nativeReady=false;}
         conversations=new Conversations(this);String previous=getPreferences(0).getString("model","");if(!previous.isEmpty()){File f=new File(getFilesDir(),"models/"+new File(previous).getName());if(f.isFile()) model=f;}
         LinearLayout screen = column();
+        getWindow().setStatusBarColor(0xff11121a);
+        getWindow().setNavigationBarColor(0xff11121a);
         screen.setBackgroundColor(0xff11121a);
         screen.setPadding(dp(12), dp(6), dp(12), dp(8));
         screen.setFitsSystemWindows(true);
@@ -113,31 +201,30 @@ public final class MainActivity extends Activity {
         Button historyButton = button("☰", v -> history());
         historyButton.setContentDescription("Historique");
         header.addView(historyButton, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        TextView brand = label(getString(R.string.app_name), 19);
+        brand = label(getString(R.string.app_name), 19);
         Drawable emblem = getDrawable(R.drawable.studio_icon);
         emblem.setBounds(0, 0, dp(28), dp(28));
         brand.setCompoundDrawablesRelative(emblem, null, null, null);
+        brand.setSingleLine();
+        brand.setEllipsize(android.text.TextUtils.TruncateAt.END);
         brand.setCompoundDrawablePadding(dp(4));
         brand.setGravity(android.view.Gravity.CENTER);
         header.addView(brand, new LinearLayout.LayoutParams(0, -2, 1));
         Button fresh = button("＋", v -> {
             if (busy) return;
-            thread = null;
-            preview(null);
-            output.setText("");
-            prompt.setText("");
-            state.setText("Prêt");
+            newConversation();
         });
         fresh.setContentDescription("Nouvelle discussion");
         header.addView(fresh, new LinearLayout.LayoutParams(dp(48), dp(48)));
         screen.addView(header);
-        screen.addView(createWorkshopBar());
+        header.setBackground(glassGradient(24, 0xff302b3b, 0xff24212d));
         modelLabel = label("", 14);
         modelLabel.setGravity(android.view.Gravity.CENTER);
         modelLabel.setMinHeight(dp(48));
         modelLabel.setOnClickListener(v -> showModelMenu());
         modelLabel.setFocusable(true);
-        screen.addView(modelLabel);
+        modelLabel.setSingleLine();
+        modelLabel.setEllipsize(android.text.TextUtils.TruncateAt.END);
         ScrollView scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         LinearLayout root = column();
@@ -146,11 +233,13 @@ public final class MainActivity extends Activity {
         screen.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         connection = label("", 12);
         root.addView(connection);
-        state = label("Prêt", 14);
+        state = label("", 14);
         root.addView(state);
         output = label("", 17);
         output.setLineSpacing(dp(3), 1);
         output.setTextIsSelectable(true);
+        messages = column();
+        root.addView(messages);
         root.addView(output);
         pick=button("Importer un modèle GGUF",v->{if(busy)return;Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.setType("*/*");i.addCategory(Intent.CATEGORY_OPENABLE);startActivityForResult(i,PICK);});
         download=button("Télécharger un modèle sur Hugging Face",v->{refreshNetwork();if(!online()){state.setText("Vous êtes hors ligne. Connectez-vous pour télécharger un modèle. Les modèles installés restent utilisables.");return;}try{startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse("https://huggingface.co/models?library=gguf")));}catch(Exception e){state.setText("Aucun navigateur disponible.");}});
@@ -183,8 +272,10 @@ public final class MainActivity extends Activity {
         composer.addView(prompt);
         LinearLayout actions = new LinearLayout(this);
         actions.addView(attachment, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        run = button("Générer localement", v -> start(false));
-        actions.addView(run, new LinearLayout.LayoutParams(0, -2, 1));
+        actions.addView(modelLabel, new LinearLayout.LayoutParams(0, dp(48), 1));
+        run = button("↑", v -> start(false));
+        run.setContentDescription("Générer localement");
+        actions.addView(run, new LinearLayout.LayoutParams(dp(48), dp(48)));
         stop = button("Arrêter", v -> {cancelled.set(true);if(nativeReady)stopNative();state.setText("Arrêt demandé…");});
         actions.addView(stop);
         composer.addView(actions);
@@ -243,7 +334,7 @@ public final class MainActivity extends Activity {
     }
 
     private Button workshopButton(String title, int highlight, int base) {
-        Button tab = button(title, view -> select(title));
+        Button tab = button(title, view -> { select(title); drawer.dismiss(); });
         tab.setMinHeight(dp(48));
         tab.setMinimumHeight(dp(48));
         tab.setPadding(dp(8), dp(7), dp(8), dp(7));
@@ -267,18 +358,19 @@ public final class MainActivity extends Activity {
     }
 
     private void select(String selected) {
-        if(!workshop.equals(selected)){thread=null;preview(null);output.setText("");prompt.setText("");}
+        if(!workshop.equals(selected)){newConversation();}
         workshop=selected;code=selected.equals("Code");
         for(java.util.Map.Entry<String,Button> tab:tabs.entrySet()){
             tab.getValue().setSelected(selected.equals(tab.getKey()));tab.getValue().setEnabled(!busy);
         }
         String hint=selected.equals("Image")?"Décrivez une illustration vectorielle…":selected.equals("Vidéo")?"Décrivez une scène animée de 3 secondes…":selected.equals("Musique")?"Décrivez une mélodie instrumentale…":"Écrire une demande…";
         prompt.setHint(hint);
+        if (thread == null) brand.setText(workshop.equals("Texte") ? getString(R.string.app_name) : workshop);
     }
     private boolean online(){ConnectivityManager cm=(ConnectivityManager)getSystemService(Context.CONNECTIVITY_SERVICE);NetworkCapabilities caps=cm.getNetworkCapabilities(cm.getActiveNetwork());return caps!=null&&caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED);}
     private void refreshNetwork(){connection.setText(online()?"En ligne · calcul toujours local":"Hors ligne · modèles installés utilisables");}
     @Override protected void onResume(){super.onResume();if(connection!=null)refreshNetwork();}
-    private void refresh(){modelLabel.setText(model==null?"Choisir un modèle ▾":display(model)+" ▾");modelLabel.setContentDescription("Modèles locaux");modelLabel.setEnabled(!busy);stop.setVisibility(busy?View.VISIBLE:View.GONE);run.setEnabled(nativeReady&&!busy&&model!=null);pick.setEnabled(!busy);download.setEnabled(!busy);stop.setEnabled(busy);select(workshop);if(!nativeReady)state.setText("Moteur natif non chargé. La génération est indisponible.");}
+    private void refresh(){modelLabel.setText(model==null?"Choisir un modèle ▾":display(model)+" ▾");modelLabel.setContentDescription("Modèles locaux");modelLabel.setEnabled(!busy);run.setVisibility(busy?View.GONE:View.VISIBLE);stop.setVisibility(busy?View.VISIBLE:View.GONE);run.setEnabled(nativeReady&&!busy&&model!=null);pick.setEnabled(!busy);download.setEnabled(!busy);stop.setEnabled(busy);select(workshop);if(!nativeReady)state.setText("Moteur natif non chargé. La génération est indisponible.");}
     @Override protected void onActivityResult(int req,int result,Intent data){super.onActivityResult(req,result,data);
         if(req==43){
             File source=exporting;exporting=null;
@@ -311,12 +403,12 @@ public final class MainActivity extends Activity {
                     String id=java.util.UUID.randomUUID().toString();File dir=creation(id);
                     File file=MediaWorkshop.render(dir,kind,answer,cancelled::get);
                     try{conversations.add(kind,id,q,file.getName());}catch(Exception e){Attachments.erase(dir);throw e;}
-                    runOnUiThread(()->{if(isDestroyed())return;thread=id;output.setText(q);preview(file);finishJob("Création enregistrée · "+file.getName());});
+                    runOnUiThread(()->{if(isDestroyed())return;thread=id;renderMessages();preview(file);finishJob("Création enregistrée · "+file.getName());});
                     return;
                 }
                 runOnUiThread(()->{if(isDestroyed())return;if(!test){
                     if(thread==null)thread=java.util.UUID.randomUUID().toString();
-                    conversations.add(category(),thread,q,answer);output.setText(conversations.read(thread));
+                    conversations.add(category(),thread,q,answer);renderMessages();if (prompt.getText().toString().trim().equals(q)) prompt.setText("");
                 }else output.setText(answer);
                 finishJob(test?"Test local réussi.":"Génération terminée · modèle déchargé.");});}catch(Exception e){runOnUiThread(()->finishJob("Génération : "+e.getMessage()));}});}
     private void finishJob(String s){if(isDestroyed())return;busy=false;state.setText(s);refresh();}

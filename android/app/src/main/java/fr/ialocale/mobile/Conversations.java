@@ -26,6 +26,13 @@ final class Conversations extends SQLiteOpenHelper {
         }
         return rows;
     }
+    ArrayList<String[]> turns(String thread) {
+        ArrayList<String[]> turns = new ArrayList<>();
+        try (Cursor c = getReadableDatabase().rawQuery("SELECT prompt, answer FROM turns WHERE thread=? ORDER BY id", new String[]{thread})) {
+            while (c.moveToNext()) turns.add(new String[]{c.getString(0), c.getString(1)});
+        }
+        return turns;
+    }
     String read(String thread) {
         StringBuilder text=new StringBuilder();
         try(Cursor c=getReadableDatabase().rawQuery("SELECT prompt, answer FROM turns WHERE thread=? ORDER BY id",new String[]{thread})) {
