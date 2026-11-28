@@ -53,11 +53,6 @@ jobs:
         run: go test -race -count=1 ./...
       - name: Vérifier JavaScript
         run: node --check desktop/web/app.js
-      - name: Intégrer le nom et l’icône Windows
-        if: runner.os == 'Windows'
-        working-directory: desktop
-        shell: bash
-        run: go run github.com/josephspurrier/goversioninfo/cmd/goversioninfo@v1.4.1 -64 -o studio_windows_amd64.syso versioninfo.json
       - name: Compiler un exécutable autonome
         working-directory: desktop
         shell: bash
@@ -66,6 +61,14 @@ jobs:
         run: |
           mkdir -p ../dist
           go build -trimpath -ldflags="-s -w" -o "../dist/${{ matrix.binary }}" .
+      - name: Inscrire le logo et le nom dans le fichier Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          npm install --prefix "$env:RUNNER_TEMP/studio-brand" --ignore-scripts --no-audit --no-fund rcedit@4.0.1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          & "$env:RUNNER_TEMP/studio-brand/node_modules/rcedit/bin/rcedit-x64.exe" dist/IA-Locale-Studio.exe --set-icon desktop/studio.ico --set-version-string ProductName "IA Locale Studio" --set-version-string FileDescription "IA Locale Studio"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - name: Vérifier le nom et l’icône de l’EXE
         if: runner.os == 'Windows'
         shell: pwsh
