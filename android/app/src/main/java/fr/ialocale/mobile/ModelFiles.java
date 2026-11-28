@@ -19,8 +19,24 @@ final class ModelFiles {
                     if(total<24 || cancelled.getAsBoolean()) throw new IOException("Import incomplet ou annule");
                     out.getFD().sync();
                 }
+                File[] candidates=dir.listFiles((folder,name)->name.endsWith(".gguf"));
+                if(candidates!=null)for(File existing:candidates){
+                    if(existing.length()==part.length() && identical(existing,part,cancelled))return existing;
+                }
                 Files.move(part.toPath(),dest.toPath()); return dest;
             } finally {part.delete();}
+        }
+    }
+    private static boolean identical(File a,File b,BooleanSupplier cancelled) throws IOException {
+        try(InputStream left=new BufferedInputStream(new FileInputStream(a));InputStream right=new BufferedInputStream(new FileInputStream(b))){
+            byte[] x=new byte[65536],y=new byte[65536];
+            while(true){
+                if(cancelled.getAsBoolean())throw new IOException("Import annulé");
+                int n=left.read(x),m=right.read(y);
+                if(n!=m)return false;
+                if(n<0)return true;
+                for(int i=0;i<n;i++)if(x[i]!=y[i])return false;
+            }
         }
     }
 }

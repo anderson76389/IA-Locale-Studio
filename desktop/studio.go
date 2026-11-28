@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"embed"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -49,6 +50,8 @@ type Job struct {
 	PromptID string    `json:"prompt_id,omitempty"`
 }
 type Request struct {
+	Thread   string          `json:"thread"`
+	Images   []string        `json:"images"`
 	Kind     string          `json:"kind"`
 	Prompt   string          `json:"prompt"`
 	Model    string          `json:"model"`
@@ -59,8 +62,9 @@ type Request struct {
 	History  []Message       `json:"history"`
 }
 type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role     string `json:"role"`
+	Content  string `json:"content"`
+	ImageJob string `json:"image_job,omitempty"`
 }
 type Studio struct {
 	root, token, ollama, comfy string
@@ -185,10 +189,29 @@ func (s *Studio) chat(ctx context.Context, job string, q Request) error {
 	}
 	messages := append([]Message{}, q.History...)
 	if q.Kind == "code" {
-		messages = append([]Message{{"system", "Tu es un assistant de programmation. Réponds précisément et explique les risques."}}, messages...)
+		messages = append([]Message{{Role: "system", Content: "Tu es un assistant de programmation. Réponds précisément et explique les risques."}}, messages...)
 	}
-	messages = append(messages, Message{"user", q.Prompt})
-	data, _ := json.Marshal(map[string]any{"model": q.Model, "messages": messages, "stream": true, "keep_alive": 0, "options": map[string]int{"num_ctx": q.Context, "num_predict": q.Tokens}})
+	messages = append(messages, Message{Role: "user", Content: q.Prompt})
+	wire := make([]map[string]any, 0, len(messages))
+	for _, m := range messages {
+		item := map[string]any{"role": m.Role, "content": m.Content}
+		if m.ImageJob != "" {
+			if !validID.MatchString(m.ImageJob) {
+				return errors.New("Référence image invalide")
+			}
+			raw, e := os.ReadFile(filepath.Join(s.outputDir(m.ImageJob), "images.json"))
+			if e != nil {
+				return e
+			}
+			item["images"] = json.RawMessage(raw)
+		}
+		wire = append(wire, item)
+	}
+	if len(q.Images) > 0 {
+		wire[len(wire)-1]["images"] = q.Images
+		messages[len(messages)-1].ImageJob = job
+	}
+	data, _ := json.Marshal(map[string]any{"model": q.Model, "messages": wire, "stream": true, "keep_alive": 0, "options": map[string]int{"num_ctx": q.Context, "num_predict": q.Tokens}})
 	req, e := http.NewRequestWithContext(ctx, "POST", s.ollama+"/api/chat", bytes.NewReader(data))
 	if e != nil {
 		return e
@@ -200,7 +223,8 @@ func (s *Studio) chat(ctx context.Context, job string, q Request) error {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		return fmt.Errorf("Ollama HTTP %d", res.StatusCode)
+		detail, _ := io.ReadAll(io.LimitReader(res.Body, 2048))
+		return fmt.Errorf("Ollama HTTP %d : %s", res.StatusCode, detail)
 	}
 	scan := bufio.NewScanner(res.Body)
 	scan.Buffer(make([]byte, 64<<10), 2<<20)
@@ -246,10 +270,19 @@ func (s *Studio) chat(ctx context.Context, job string, q Request) error {
 	if e = os.Mkdir(s.outputDir(job), 0700); e != nil {
 		return e
 	}
+	if len(q.Images) > 0 {
+		raw, err := json.Marshal(q.Images)
+		if err != nil {
+			return err
+		}
+		if err = os.WriteFile(filepath.Join(s.outputDir(job), "images.json"), raw, 0600); err != nil {
+			return err
+		}
+	}
 	if e = os.WriteFile(filepath.Join(s.outputDir(job), "reponse.txt"), []byte(b.String()), 0600); e != nil {
 		return e
 	}
-	messages = append(messages, Message{"assistant", b.String()})
+	messages = append(messages, Message{Role: "assistant", Content: b.String()})
 	data, e = json.MarshalIndent(map[string]any{"model": q.Model, "kind": q.Kind, "messages": messages}, "", "  ")
 	if e != nil {
 		return e
@@ -453,11 +486,26 @@ func validRequest(q Request) error {
 		if !modelID.MatchString(q.Model) || q.Context < 1024 || q.Context > 32768 || q.Tokens < 64 || q.Tokens > 8192 {
 			return errors.New("Modèle ou limites de génération invalides")
 		}
+		total := 0
+		if len(q.Images) > 16 {
+			return errors.New("16 images maximum")
+		}
+		for _, encoded := range q.Images {
+			img, err := base64.StdEncoding.DecodeString(encoded)
+			if err != nil {
+				return errors.New("Image illisible")
+			}
+			total += len(img)
+			mime := http.DetectContentType(img)
+			if total > 2<<20 || (mime != "image/png" && mime != "image/jpeg" && mime != "image/webp") {
+				return errors.New("Images JPEG, PNG ou WebP de 2 Mio maximum au total")
+			}
+		}
 		if len(q.History) > 40 {
 			return errors.New("Historique limité à 40 messages")
 		}
 		for _, m := range q.History {
-			if (m.Role != "user" && m.Role != "assistant") || len(m.Content) > 128<<10 {
+			if m.ImageJob != "" || (m.Role != "user" && m.Role != "assistant") || len(m.Content) > 128<<10 {
 				return errors.New("Message invalide")
 			}
 		}
@@ -551,6 +599,10 @@ func (s *Studio) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch r.Method + " " + r.URL.Path {
+	case "GET /api/history", "POST /api/history/delete":
+		s.historyAPI(w, r)
+	case "POST /api/attachment":
+		s.attachment(w, r)
 	case "GET /api/status":
 		writeJSON(w, 200, s.status(r.Context()))
 	case "GET /api/observer":
@@ -568,10 +620,19 @@ func (s *Studio) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		j, e := s.start(q.Kind, func(ctx context.Context, job string) error {
-			if q.Kind == "texte" || q.Kind == "code" {
-				return s.chat(ctx, job, q)
+			if e := s.resume(&q); e != nil {
+				return e
 			}
-			return s.media(ctx, job, q)
+			var err error
+			if q.Kind == "texte" || q.Kind == "code" {
+				err = s.chat(ctx, job, q)
+			} else {
+				err = s.media(ctx, job, q)
+			}
+			if err != nil {
+				return err
+			}
+			return s.saveTurn(job, q)
 		})
 		if e != nil {
 			reject(w, 409, e.Error())
@@ -732,7 +793,7 @@ func (s *Studio) serve(w http.ResponseWriter, r *http.Request) {
 	case "GET /api/outputs":
 		ds, _ := os.ReadDir(filepath.Join(s.root, "data", "outputs"))
 		rows := []map[string]string{}
-		for i := len(ds) - 1; i >= 0 && len(rows) < 300; i-- {
+		for i := len(ds) - 1; i >= 0; i-- {
 			d := ds[i]
 			if !d.IsDir() || !validID.MatchString(d.Name()) {
 				continue

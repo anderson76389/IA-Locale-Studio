@@ -264,3 +264,58 @@ func TestStudioConcurrentStop(t *testing.T) {
 		t.Fatal(j)
 	}
 }
+
+func TestHistoryRestartResumeDelete(t *testing.T) {
+	var calls int
+	engine := func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/tags" {
+			io.WriteString(w, `{"models":[{"name":"x:1","size":123,"details":{"format":"gguf"}}]}`)
+			return
+		}
+		var body struct{ Messages []Message }
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Error(err)
+		}
+		calls++
+		if calls == 2 && (len(body.Messages) != 3 || body.Messages[0].Content != "Premier") {
+			t.Error("contexte perdu", body.Messages)
+		}
+		io.WriteString(w, `{"message":{"content":"OK"},"done":true}`)
+	}
+	s := studioWith(t, engine)
+	q := Request{Kind: "texte", Model: "x:1", Prompt: "Premier", Context: 2048, Tokens: 64}
+	launch(t, s, q)
+	first := await(t, s)
+	restarted, e := newStudio(s.root, s.ollama, s.comfy)
+	if e != nil {
+		t.Fatal(e)
+	}
+	q.Thread = first.ID
+	q.Prompt = "Suite"
+	launch(t, restarted, q)
+	second := await(t, restarted)
+	if second.State != "done" {
+		t.Fatal(second.Error)
+	}
+	q.Kind = "code"
+	launch(t, restarted, q)
+	if await(t, restarted).State != "error" {
+		t.Fatal("atelier incorrect accepté")
+	}
+	q.Thread = ""
+	launch(t, restarted, q)
+	separate := await(t, restarted)
+	deleted := req(t, restarted, "POST", "/api/history/delete", map[string]string{"thread": first.ID}, true)
+	if deleted.Code != 200 {
+		t.Fatal(deleted.Body.String())
+	}
+	for _, job := range []Job{first, second} {
+		if _, e := os.Stat(s.outputDir(job.ID)); !os.IsNotExist(e) {
+			t.Fatal("sortie conservée", job.ID)
+		}
+	}
+	rows, e := restarted.turns()
+	if e != nil || len(rows) != 1 || rows[0].ID != separate.ID {
+		t.Fatal(rows, e)
+	}
+}

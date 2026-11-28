@@ -28,3 +28,13 @@
 **Android** embarque un moteur CPU pour **Texte** et **Code**. Les trois ateliers médias restent à intégrer sur Android. La signature de test peut empêcher une mise à jour par-dessus un APK précédent. [Guide Android et compilation](android/README.md)
 
 Les versions publiées sont des préversions. Les essais avec génération réelle sur GPU et sur téléphone restent à effectuer. [Contrôles GitHub Actions](https://github.com/anderson76389/IA-Locale-Studio/actions) · [Empreintes SHA-256](https://github.com/anderson76389/IA-Locale-Studio/releases/download/preview-2e2b2495c21f/SHA256SUMS.txt)
+
+### Historique et pièces jointes
+
+Sur Windows et Linux, chaque atelier a son historique local. Ouvrez une discussion pour la reprendre. « Supprimer définitivement » efface tous ses tours et leurs sorties du dossier actif. Les archives de sauvegarde et les copies exportées sont indépendantes.
+
+Dans Texte et Code, ajoutez des documents UTF-8, DOCX, PPTX, des PDF avec couche texte (outil `pdftotext`) ou des images JPEG, PNG et WebP avec un modèle Ollama vision. Pour transcrire un enregistrement, installez FFmpeg et `whisper-cli`, renseignez la variable `IA_WHISPER_MODEL` avec le chemin absolu de votre modèle whisper.cpp et relancez le Studio. La transcription traite les dix premières minutes.
+
+Sur Android, Texte et Code conservent leurs discussions dans l’application. « Gérer les modèles » permet de changer de GGUF ou de le supprimer. L’import reconnaît les copies identiques. Le bouton de pièce jointe extrait le texte des images et transcrit la parole des pistes audio compatibles avec le décodeur du téléphone. Pour activer la transcription française, importez le ZIP du modèle via « Modèle de transcription Vosk ». [Modèle français Vosk](https://alphacephei.com/vosk/models/vosk-model-small-fr-0.22.zip)
+
+« Tester hors ligne » lance un calcul avec le modèle installé. Sur PC, dans Image, Vidéo et Musique, le test exécute le workflow ComfyUI choisi et vérifie la sortie attendue. Pour vérifier le fonctionnement sans Internet d’un workflow comportant des nœuds tiers, coupez le réseau avant le test.
